@@ -15,7 +15,7 @@ export function LoginPage() {
   const [remember, setRemember] = useState(() => localStorage.getItem(REMEMBER_KEY) !== null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const { signIn, isManager } = useAuth()
+  const { signIn } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -26,8 +26,9 @@ export function LoginPage() {
     setError(null)
     setIsLoading(true)
     try {
-      await signIn(email, password)
-      if (!isManager) {
+      const session = await signIn(email, password)
+      const role = session?.user?.user_metadata?.role?.toString() ?? null
+      if (role !== 'manager') {
         setError('Access denied. Only managers can log in.')
         return
       }

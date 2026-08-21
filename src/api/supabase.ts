@@ -11,7 +11,9 @@ const missingVars = [
 if (missingVars.length > 0) {
   throw new Error(
     `Missing Supabase environment variables: ${missingVars.join(', ')}. ` +
-      'Check your .env file and RESTART the dev server (Vite only reads .env at startup).',
+      'Locally: add them to .env and restart the dev server. ' +
+      'On Vercel/Netlify: add them under Project → Settings → Environment Variables, then redeploy ' +
+      '(Vite inlines VITE_* variables at build time).',
   )
 }
 
