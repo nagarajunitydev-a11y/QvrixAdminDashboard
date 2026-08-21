@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+
+<html class="h-full bg-surface" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Velocity Enterprise - Admin Sign Up</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700&amp;family=Inter:wght@400;500;600&amp;family=Geist:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-secondary-fixed-variant": "#3c475a",
+                      "on-tertiary": "#ffffff",
+                      "error": "#ba1a1a",
+                      "error-container": "#ffdad6",
+                      "inverse-surface": "#2d3133",
+                      "on-error": "#ffffff",
+                      "on-primary-container": "#eeefff",
+                      "on-primary-fixed-variant": "#003ea8",
+                      "on-secondary": "#ffffff",
+                      "inverse-primary": "#b4c5ff",
+                      "surface-container-highest": "#e0e3e5",
+                      "surface-tint": "#0053db",
+                      "primary-fixed": "#dbe1ff",
+                      "on-tertiary-container": "#e9f0ff",
+                      "tertiary": "#46566c",
+                      "surface-dim": "#d8dadc",
+                      "surface-variant": "#e0e3e5",
+                      "tertiary-fixed-dim": "#b7c8e1",
+                      "tertiary-fixed": "#d3e4fe",
+                      "surface-container-high": "#e6e8ea",
+                      "primary-container": "#2563eb",
+                      "outline-variant": "#c3c6d7",
+                      "secondary-fixed": "#d8e3fb",
+                      "on-secondary-fixed": "#111c2d",
+                      "primary-fixed-dim": "#b4c5ff",
+                      "on-primary": "#ffffff",
+                      "on-surface": "#191c1e",
+                      "secondary-container": "#d5e0f8",
+                      "on-error-container": "#93000a",
+                      "on-surface-variant": "#434655",
+                      "tertiary-container": "#5e6e85",
+                      "surface-container-lowest": "#ffffff",
+                      "background": "#f7f9fb",
+                      "on-tertiary-fixed": "#0b1c30",
+                      "primary": "#004ac6",
+                      "secondary": "#545f73",
+                      "outline": "#737686",
+                      "surface-container": "#eceef0",
+                      "surface-bright": "#f7f9fb",
+                      "on-secondary-container": "#586377",
+                      "secondary-fixed-dim": "#bcc7de",
+                      "surface": "#f7f9fb",
+                      "on-background": "#191c1e",
+                      "surface-container-low": "#f2f4f6",
+                      "inverse-on-surface": "#eff1f3",
+                      "on-tertiary-fixed-variant": "#38485d",
+                      "on-primary-fixed": "#00174b"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "gutter": "16px",
+                      "section-padding": "32px",
+                      "stack-lg": "24px",
+                      "base": "4px",
+                      "container-margin": "24px",
+                      "stack-md": "16px",
+                      "stack-sm": "8px"
+              },
+              "fontFamily": {
+                      "display-lg": [
+                              "Hanken Grotesk"
+                      ],
+                      "headline-lg-mobile": [
+                              "Hanken Grotesk"
+                      ],
+                      "body-sm": [
+                              "Inter"
+                      ],
+                      "body-lg": [
+                              "Inter"
+                      ],
+                      "label-md": [
+                              "Geist"
+                      ],
+                      "headline-lg": [
+                              "Hanken Grotesk"
+                      ],
+                      "headline-md": [
+                              "Hanken Grotesk"
+                      ],
+                      "label-sm": [
+                              "Geist"
+                      ],
+                      "body-md": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "display-lg": [
+                              "36px",
+                              {
+                                      "lineHeight": "44px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-lg-mobile": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-sm": [
+                              "13px",
+                              {
+                                      "lineHeight": "18px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-lg": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "label-md": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.02em",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "headline-lg": [
+                              "28px",
+                              {
+                                      "lineHeight": "36px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-md": [
+                              "20px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "label-sm": [
+                              "11px",
+                              {
+                                      "lineHeight": "14px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "400"
+                              }
+                      }
+              }
+            },
+          }
+    </script>
+<style>
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+    </style>
+</head>
+<body class="h-full w-full flex items-center justify-center p-gutter md:p-section-padding bg-surface-container-low text-on-surface">
+<main class="w-full max-w-5xl mx-auto flex flex-col md:flex-row rounded-xl overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)] bg-surface-container-lowest border border-outline-variant/30 relative">
+<!-- Left Column: Branding / Value Prop -->
+<section class="w-full md:w-5/12 bg-on-tertiary-fixed relative flex flex-col justify-between p-stack-lg md:p-section-padding overflow-hidden">
+<!-- Decorative Background Element -->
+<div class="absolute inset-0 z-0 opacity-20 pointer-events-none">
+<div class="bg-cover bg-center w-full h-full opacity-30 mix-blend-overlay" data-alt="A sophisticated, high-contrast corporate tech background featuring subtle, glowing blue geometric grid lines superimposed over a deep navy blue and slate grey gradient. The lighting is modern and sleek, evoking a sense of 'mission control' data processing and high-stakes logistics planning. The overall aesthetic is clean, professional, and dense with implied information, avoiding chaotic imagery in favor of structured, elegant technology visuals." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBeso-2hCY_tr1nSrZ1V84fqRs0HaYliGzvFCRNvl3Ejl4EDkFgzO8IFXSG8su2TubeWH556jtQKYGBgIskWQftqJ1VZa4HYabvh6Ssp_W-tsUM_tIhCTLCObVFhNKqnIMg8QiWHrnBcM7nTXY_TyC8DsQ34DoBcLMSedZ7okG4hZo0w4An6MN4xHArmVVZYD49dxDyG_VbBg2EY43Z094lT7uVz7QicQlfrVX9YCBPvE7VtmsyLZka')"></div>
+</div>
+<div class="z-10 relative">
+<div class="flex items-center gap-2 mb-stack-lg">
+<div class="w-8 h-8 rounded bg-primary flex items-center justify-center text-on-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1; font-size: 20px;">route</span>
+</div>
+<span class="font-headline-md text-headline-md text-on-primary tracking-tight">Velocity Enterprise</span>
+</div>
+<div class="mt-12 md:mt-24">
+<h1 class="font-display-lg text-display-lg text-on-primary mb-stack-md">Mission Control for Workforce Logistics.</h1>
+<p class="font-body-lg text-body-lg text-on-primary/80">Scale operations, optimize routing, and manage your field teams with unprecedented clarity and precision.</p>
+</div>
+</div>
+<div class="z-10 relative mt-12 md:mt-auto border-t border-on-primary/10 pt-stack-md">
+<div class="flex items-center gap-3">
+<div class="flex -space-x-2">
+<img class="w-8 h-8 rounded-full border-2 border-on-tertiary-fixed object-cover" data-alt="Headshot of a professional operations manager in a well-lit modern office environment. Soft, diffuse natural lighting highlighting clean features. Subtle blue and grey corporate tones in the background, conveying a high-stakes, structured corporate setting. High resolution, professional portrait style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD4ZbX6tSOs6LW2hPykEIkhpyTUWTQwrClrzCJ5g50pe82AkfI6XxPDYewjeqxXeCc6CYQvfG7YKt2qK8XzD-Zh-NTZGklcwb8IwMjKNkT2aDzY-UkzBO-aUID3geaSiAyQTA_HPtwCufPEx1II47qxr8jBy8IVACi8Yks20_NkK3UOgCH52cmp3NxmY18C2apj5u4x7mmJKmYjIHg8dITp1_O7ZZPVPQqUCtoefR_XK8b-aaOczaSN"/>
+<img class="w-8 h-8 rounded-full border-2 border-on-tertiary-fixed object-cover" data-alt="Headshot of a confident female HR administrator in a sleek, contemporary workspace. High-key lighting creating a bright, optimistic mood. The color palette incorporates cool neutrals and sharp whites, perfectly aligning with a modern, professional workforce management aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDtMCcDauaJJ6Z95uw1ASWy8nu4ndqAVE_TDYc_7CTH4Z-x0bdGZu6eClxdp5n_vOaYgIYrAJrh6_oOk9jwnnMKnfZsi99mKThoObxJ8rqTwEodnxAtK1XXILF2WgScgIHYfevKpuo7QlXH_N_1a5zkBshE2ca89Sm3y98rZPyioPbI0OklDK8XsZ12M2B63RefrjIIwJTgCg_dOxX0CXlO1woI3zr6UusYmkSRp7XHx-zXpsKFs6qy"/>
+<img class="w-8 h-8 rounded-full border-2 border-on-tertiary-fixed object-cover" data-alt="Headshot of an experienced fleet supervisor wearing practical but professional attire, standing near a clean logistics hub. Strong, authoritative posture with balanced, clear lighting. The environment is orderly, reflecting efficiency and operational control. Corporate color palette dominating." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBPRxIyxRh976U43urPO-g8ruMQYRBosdhkB9hqDXYtuAptfzNMNk846S2TmXoISirTKU25ec_FYF9aldywvvxpSTUjlZK7_upKteSya2SD9nBllzT0uOG_uCzGOxepuXcoDGziUOmtuL9v382TYs3fLZHXnUAijxQDDBMxCW9d2ilHs0flfQVjjx2gVlO9VcSBZebefTwEqXwVXY5GY1QIgP0yYh3jtQwAYOcWzQPOOLbFaH7NXjrb"/>
+</div>
+<p class="font-label-sm text-label-sm text-on-primary/70">Join 10,000+ logistics professionals</p>
+</div>
+</div>
+</section>
+<!-- Right Column: Registration Form -->
+<section class="w-full md:w-7/12 p-stack-lg md:p-section-padding lg:px-12 flex flex-col justify-center bg-surface-container-lowest z-10 relative">
+<div class="max-w-md w-full mx-auto">
+<div class="mb-stack-lg">
+<h2 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-2">Create Admin Account</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Setup your organization's mission control access.</p>
+</div>
+<form class="space-y-4">
+<!-- Name Row -->
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface" for="fullName">Full Name</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">person</span>
+<input class="w-full pl-10 pr-3 py-2 bg-surface-container-lowest border border-outline-variant rounded focus:border-primary focus:ring-2 focus:ring-primary/20 font-body-md text-body-md text-on-surface transition-all duration-150 outline-none" id="fullName" placeholder="Jane Doe" required="" type="text"/>
+</div>
+</div>
+<!-- Work Email -->
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface" for="workEmail">Work Email</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">mail</span>
+<input class="w-full pl-10 pr-3 py-2 bg-surface-container-lowest border border-outline-variant rounded focus:border-primary focus:ring-2 focus:ring-primary/20 font-body-md text-body-md text-on-surface transition-all duration-150 outline-none" id="workEmail" placeholder="jane@company.com" required="" type="email"/>
+</div>
+</div>
+<!-- Company & Role Row -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface" for="companyName">Company Name</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">domain</span>
+<input class="w-full pl-10 pr-3 py-2 bg-surface-container-lowest border border-outline-variant rounded focus:border-primary focus:ring-2 focus:ring-primary/20 font-body-md text-body-md text-on-surface transition-all duration-150 outline-none" id="companyName" placeholder="Acme Logistics" required="" type="text"/>
+</div>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface" for="role">Primary Role</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px] z-10 pointer-events-none">work</span>
+<select class="w-full pl-10 pr-8 py-2 bg-surface-container-lowest border border-outline-variant rounded focus:border-primary focus:ring-2 focus:ring-primary/20 font-body-md text-body-md text-on-surface appearance-none transition-all duration-150 outline-none cursor-pointer" id="role" required="">
+<option disabled="" selected="" value="">Select a role...</option>
+<option value="operations_manager">Operations Manager</option>
+<option value="hr_admin">HR Admin</option>
+<option value="fleet_supervisor">Fleet Supervisor</option>
+<option value="executive">Executive</option>
+<option value="other">Other</option>
+</select>
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-outline text-[20px] pointer-events-none">expand_more</span>
+</div>
+</div>
+</div>
+<!-- Passwords Row -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface" for="password">Password</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">lock</span>
+<input class="w-full pl-10 pr-3 py-2 bg-surface-container-lowest border border-outline-variant rounded focus:border-primary focus:ring-2 focus:ring-primary/20 font-body-md text-body-md text-on-surface transition-all duration-150 outline-none" id="password" placeholder="••••••••" required="" type="password"/>
+</div>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface" for="confirmPassword">Confirm Password</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">lock</span>
+<input class="w-full pl-10 pr-3 py-2 bg-surface-container-lowest border border-outline-variant rounded focus:border-primary focus:ring-2 focus:ring-primary/20 font-body-md text-body-md text-on-surface transition-all duration-150 outline-none" id="confirmPassword" placeholder="••••••••" required="" type="password"/>
+</div>
+</div>
+</div>
+<div class="pt-stack-sm">
+<button class="w-full bg-primary-container text-on-primary py-2.5 px-4 rounded font-label-md text-label-md font-semibold hover:bg-primary-container/90 hover:shadow-[inset_0_2px_4px_rgba(255,255,255,0.2)] focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all duration-150 flex items-center justify-center gap-2" type="submit">
+                            Create Account
+                            <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</button>
+</div>
+</form>
+<div class="mt-stack-lg text-center border-t border-outline-variant/30 pt-stack-md">
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+                        Already have an account? <a class="text-primary hover:text-primary-fixed-variant font-medium transition-colors" href="#">Log in</a>
+</p>
+<p class="font-label-sm text-label-sm text-outline mt-stack-md max-w-[280px] mx-auto">
+                        By signing up, you agree to the <a class="underline hover:text-on-surface-variant" href="#">Terms of Service</a> and <a class="underline hover:text-on-surface-variant" href="#">Privacy Policy</a>.
+                    </p>
+</div>
+</div>
+</section>
+</main>
+</body></html>

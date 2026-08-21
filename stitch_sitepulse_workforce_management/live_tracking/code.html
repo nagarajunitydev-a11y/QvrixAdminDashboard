@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Live Tracking - Mission Control</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Hanken+Grotesk:wght@100..900&family=Inter:wght@100..900&display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Config -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-container": "#5e6e85",
+                        "on-surface-variant": "#434655",
+                        "primary-fixed": "#dbe1ff",
+                        "on-background": "#191c1e",
+                        "on-error-container": "#93000a",
+                        "error": "#ba1a1a",
+                        "surface-dim": "#d8dadc",
+                        "on-primary": "#ffffff",
+                        "tertiary-fixed-dim": "#b7c8e1",
+                        "on-secondary-fixed": "#111c2d",
+                        "on-tertiary-container": "#e9f0ff",
+                        "surface-variant": "#e0e3e5",
+                        "on-surface": "#191c1e",
+                        "secondary": "#545f73",
+                        "primary-fixed-dim": "#b4c5ff",
+                        "on-secondary-fixed-variant": "#3c475a",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "primary-container": "#2563eb",
+                        "secondary-container": "#d5e0f8",
+                        "tertiary": "#46566c",
+                        "on-tertiary-fixed": "#0b1c30",
+                        "secondary-fixed-dim": "#bcc7de",
+                        "inverse-primary": "#b4c5ff",
+                        "outline": "#737686",
+                        "secondary-fixed": "#d8e3fb",
+                        "primary": "#004ac6",
+                        "outline-variant": "#c3c6d7",
+                        "on-primary-container": "#eeefff",
+                        "tertiary-fixed": "#d3e4fe",
+                        "on-error": "#ffffff",
+                        "surface-bright": "#f7f9fb",
+                        "surface-container-high": "#e6e8ea",
+                        "surface-container-low": "#f2f4f6",
+                        "inverse-surface": "#2d3133",
+                        "inverse-on-surface": "#eff1f3",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container": "#eceef0",
+                        "on-tertiary-fixed-variant": "#38485d",
+                        "background": "#f7f9fb",
+                        "on-primary-fixed": "#00174b",
+                        "surface-tint": "#0053db",
+                        "surface-container-highest": "#e0e3e5",
+                        "on-secondary-container": "#586377",
+                        "on-primary-fixed-variant": "#003ea8",
+                        "error-container": "#ffdad6",
+                        "surface": "#f7f9fb"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-sm": "8px",
+                        "base": "4px",
+                        "stack-lg": "24px",
+                        "stack-md": "16px",
+                        "section-padding": "32px",
+                        "gutter": "16px",
+                        "container-margin": "24px"
+                    },
+                    "fontFamily": {
+                        "headline-lg-mobile": ["Hanken Grotesk"],
+                        "headline-md": ["Hanken Grotesk"],
+                        "label-sm": ["Geist"],
+                        "body-md": ["Inter"],
+                        "label-md": ["Geist"],
+                        "display-lg": ["Hanken Grotesk"],
+                        "headline-lg": ["Hanken Grotesk"],
+                        "body-sm": ["Inter"],
+                        "body-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "label-sm": ["11px", { "lineHeight": "14px", "fontWeight": "600" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "display-lg": ["36px", { "lineHeight": "44px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-lg": ["28px", { "lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "body-sm": ["13px", { "lineHeight": "18px", "fontWeight": "400" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-background font-body-md h-screen w-screen overflow-hidden flex">
+<!-- SideNavBar -->
+<nav class="bg-[#1e293b] flex flex-col h-screen w-64 fixed left-0 top-0 z-50">
+<div class="h-16 flex items-center px-6 border-b border-white/10">
+<h1 class="font-headline-md text-headline-md font-bold text-white">Mission Control</h1>
+</div>
+<div class="px-6 py-2">
+<p class="font-label-sm text-label-sm text-[#94a3b8] uppercase tracking-wider">Workforce Logistics</p>
+</div>
+<ul class="flex-1 overflow-y-auto py-4 space-y-1">
+<li>
+<a class="flex items-center px-6 py-3 text-[#94a3b8] hover:bg-[#334155] hover:text-white transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-3 text-lg" data-icon="dashboard">dashboard</span>
+<span class="font-label-md text-label-md">Dashboard</span>
+</a>
+</li>
+<li>
+<a class="flex items-center px-6 py-3 bg-[#334155] text-white border-l-4 border-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-3 text-lg" data-icon="location_on">location_on</span>
+<span class="font-label-md text-label-md">Live Tracking</span>
+</a>
+</li>
+<li>
+<a class="flex items-center px-6 py-3 text-[#94a3b8] hover:bg-[#334155] hover:text-white transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-3 text-lg" data-icon="group">group</span>
+<span class="font-label-md text-label-md">Employees</span>
+</a>
+</li>
+<li>
+<a class="flex items-center px-6 py-3 text-[#94a3b8] hover:bg-[#334155] hover:text-white transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-3 text-lg" data-icon="domain">domain</span>
+<span class="font-label-md text-label-md">Sites</span>
+</a>
+</li>
+<li>
+<a class="flex items-center px-6 py-3 text-[#94a3b8] hover:bg-[#334155] hover:text-white transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-3 text-lg" data-icon="event_available">event_available</span>
+<span class="font-label-md text-label-md">Attendance</span>
+</a>
+</li>
+<li>
+<a class="flex items-center px-6 py-3 text-[#94a3b8] hover:bg-[#334155] hover:text-white transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-3 text-lg" data-icon="schedule">schedule</span>
+<span class="font-label-md text-label-md">Shifts</span>
+</a>
+</li>
+<li>
+<a class="flex items-center px-6 py-3 text-[#94a3b8] hover:bg-[#334155] hover:text-white transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-3 text-lg" data-icon="history">history</span>
+<span class="font-label-md text-label-md">History</span>
+</a>
+</li>
+<li>
+<a class="flex items-center px-6 py-3 text-[#94a3b8] hover:bg-[#334155] hover:text-white transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-3 text-lg" data-icon="notifications_active">notifications_active</span>
+<span class="font-label-md text-label-md">Alerts</span>
+</a>
+</li>
+<li>
+<a class="flex items-center px-6 py-3 text-[#94a3b8] hover:bg-[#334155] hover:text-white transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-3 text-lg" data-icon="settings">settings</span>
+<span class="font-label-md text-label-md">Settings</span>
+</a>
+</li>
+</ul>
+<div class="p-4 border-t border-white/10 mt-auto">
+<div class="flex items-center gap-3">
+<img alt="Admin Avatar" class="w-10 h-10 rounded-full object-cover" data-alt="A small, professional headshot of an administrative user in a corporate logistics setting. Crisp lighting, plain neutral background, light mode aesthetic, conveying authority and competence." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDcEjeuaIIeEC_GX7WqxCtJhMCdLpWZ41UkcGhrrGwz3Lk5VGptioAEIphiRwjerfs0MozqkgMMPnzy7WP7v2wQPG9UsArab2IkLUk1RuJbfyEvk9smL1eYQc481Ti4bROIag8tEo4PAO3JEbTD8AaQncLQh-qQkT9URkdLB56M4cGvQeZBskE1cjTlLXgiW2eGUABNiwixox6rcbkkd6C69tOlAQZIGorp-cl-tdNXnkZtDsqKpOB4"/>
+<div>
+<p class="font-label-md text-label-md text-white">Admin User</p>
+<p class="font-label-sm text-label-sm text-[#94a3b8]">System Administrator</p>
+</div>
+</div>
+</div>
+</nav>
+<!-- Main Content Area -->
+<div class="flex-1 flex flex-col ml-64 relative h-screen w-[calc(100%-16rem)]">
+<!-- TopAppBar -->
+<header class="bg-surface-container-lowest dark:bg-inverse-surface border-b border-outline-variant shadow-sm flex justify-between items-center h-16 px-6 z-40 relative">
+<div class="flex items-center gap-4">
+<span class="font-headline-md text-headline-md font-semibold text-on-surface">Admin Console</span>
+</div>
+<div class="flex-1 max-w-md mx-8">
+<div class="relative w-full">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline" data-icon="search">search</span>
+<input class="w-full h-9 pl-10 pr-4 bg-surface rounded text-body-sm font-body-sm border border-outline-variant focus:border-primary focus:ring focus:ring-primary/20 outline-none transition-all duration-150 text-on-surface placeholder:text-on-surface-variant/50" placeholder="Search employees, sites, or ID..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button class="p-2 rounded-full hover:bg-surface-container-low text-on-surface-variant transition-all duration-150">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="p-2 rounded-full hover:bg-surface-container-low text-on-surface-variant transition-all duration-150">
+<span class="material-symbols-outlined" data-icon="help_outline">help_outline</span>
+</button>
+<div class="h-6 w-px bg-outline-variant mx-2"></div>
+<button class="font-label-md text-label-md text-on-surface-variant hover:bg-surface-container-low px-3 py-1.5 rounded transition-all duration-150">Settings</button>
+<button class="font-label-md text-label-md text-primary font-bold border-b-2 border-primary hover:bg-surface-container-low px-3 py-1.5 transition-all duration-150">Profile</button>
+</div>
+</header>
+<!-- Filter Bar -->
+<div class="bg-surface-container-lowest border-b border-outline-variant p-2 px-4 z-30 shadow-sm flex flex-wrap gap-3 items-center">
+<div class="relative w-48">
+<span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-outline text-[18px]" data-icon="person_search">person_search</span>
+<input class="w-full h-8 pl-8 pr-2 bg-surface rounded text-label-md font-label-md border border-outline-variant focus:border-primary focus:ring focus:ring-primary/20 outline-none" placeholder="Search Employee..." type="text"/>
+</div>
+<div class="relative w-40">
+<span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-outline text-[18px]" data-icon="location_city">location_city</span>
+<select class="w-full h-8 pl-8 pr-8 bg-surface rounded text-label-md font-label-md border border-outline-variant focus:border-primary focus:ring focus:ring-primary/20 outline-none appearance-none cursor-pointer">
+<option value="">All Sites</option>
+<option value="s1">Alpha Facility</option>
+<option value="s2">Bravo Warehouse</option>
+<option value="s3">HQ Campus</option>
+</select>
+<span class="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-outline text-[18px] pointer-events-none" data-icon="arrow_drop_down">arrow_drop_down</span>
+</div>
+<div class="h-5 w-px bg-outline-variant hidden md:block"></div>
+<select class="h-8 px-2 bg-surface rounded text-label-md font-label-md border border-outline-variant focus:border-primary focus:ring focus:ring-primary/20 outline-none cursor-pointer">
+<option value="">Department</option>
+<option value="sec">Security</option>
+<option value="mnt">Maintenance</option>
+<option value="log">Logistics</option>
+</select>
+<select class="h-8 px-2 bg-surface rounded text-label-md font-label-md border border-outline-variant focus:border-primary focus:ring focus:ring-primary/20 outline-none cursor-pointer">
+<option value="">Supervisor</option>
+<option value="jdoe">J. Doe</option>
+<option value="asmith">A. Smith</option>
+</select>
+<select class="h-8 px-2 bg-surface rounded text-label-md font-label-md border border-outline-variant focus:border-primary focus:ring focus:ring-primary/20 outline-none cursor-pointer">
+<option value="">Shift</option>
+<option value="morning">Morning (06:00 - 14:00)</option>
+<option value="afternoon">Afternoon (14:00 - 22:00)</option>
+<option value="night">Night (22:00 - 06:00)</option>
+</select>
+<div class="h-5 w-px bg-outline-variant hidden md:block"></div>
+<div class="flex items-center gap-2">
+<label class="flex items-center gap-1 cursor-pointer">
+<input checked="" class="rounded border-outline-variant text-primary focus:ring-primary h-3.5 w-3.5" type="checkbox"/>
+<span class="font-label-sm text-label-sm text-on-surface flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-green-500 inline-block"></span> Inside Site</span>
+</label>
+<label class="flex items-center gap-1 cursor-pointer">
+<input checked="" class="rounded border-outline-variant text-primary focus:ring-primary h-3.5 w-3.5" type="checkbox"/>
+<span class="font-label-sm text-label-sm text-on-surface flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-500 inline-block"></span> Outside Site</span>
+</label>
+<label class="flex items-center gap-1 cursor-pointer">
+<input class="rounded border-outline-variant text-primary focus:ring-primary h-3.5 w-3.5" type="checkbox"/>
+<span class="font-label-sm text-label-sm text-on-surface flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-red-500 inline-block"></span> Offline</span>
+</label>
+</div>
+<div class="ml-auto">
+<button class="bg-primary text-on-primary hover:bg-primary/90 font-label-md text-label-md px-4 h-8 rounded flex items-center gap-2 shadow-sm transition-all">
+<span class="material-symbols-outlined text-[18px]" data-icon="refresh">refresh</span>
+                    Refresh Data
+                </button>
+</div>
+</div>
+<!-- Map Container -->
+<div class="flex-1 relative bg-slate-200 overflow-hidden" id="map-container">
+<!-- Simulated Map Background -->
+<img alt="Map Area" class="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-multiply" data-alt="A high-contrast, professional, minimalist map interface typical of enterprise logistics software. The map shows a detailed urban layout in light mode with subtle grey and off-white tones, avoiding visual clutter to highlight operational data overlays." data-location="New York City" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBFwu1POQ6kTFv-6pM0s4asKEnnaaKL8ugVtFGDjdxkcz6-d71JHHR9_L6Y3sMDN_H_T66jOFNECe1imAIiYx991BgMmcCWS8wFbq9LkRiTrRe5oJTSI2aiX7Y9XS2_N_yE-pEQ6qa-YmE7tS0v_lVare_VJg6Tp8Zf8JQxY_sTuDfjuEHEpBe31CIQeVlbiTawttkC7gxwqfGd0gN8IZvRNV6W0ZvCIL6aaXYkX_rH_4kN-mYD7Xrv"/>
+<!-- Map Grid/Pattern Overlay for texture -->
+<div class="absolute inset-0" style="background-image: radial-gradient(#cbd5e1 1px, transparent 1px); background-size: 20px 20px;"></div>
+<!-- Simulated Geofences -->
+<div class="absolute top-1/4 left-1/3 w-64 h-64 rounded-full border-2 border-blue-500 bg-blue-500/10 flex items-center justify-center">
+<span class="font-label-sm text-blue-700 bg-white/80 px-2 py-0.5 rounded shadow-sm absolute -top-3">Alpha Facility Zone</span>
+</div>
+<div class="absolute bottom-1/3 right-1/4 w-48 h-48 rounded-lg border-2 border-green-500 bg-green-500/10 transform rotate-12 flex items-center justify-center">
+<span class="font-label-sm text-green-700 bg-white/80 px-2 py-0.5 rounded shadow-sm absolute -top-3 -rotate-12">Bravo Sector</span>
+</div>
+<!-- Simulated Markers -->
+<!-- Marker 1: Inside (Green) -->
+<div class="absolute top-[30%] left-[38%] group cursor-pointer" onclick="toggleDetails('employee-1')">
+<div class="relative flex items-center justify-center w-8 h-8">
+<span class="absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75 animate-ping"></span>
+<div class="relative bg-white border-2 border-green-500 rounded-full w-8 h-8 flex items-center justify-center shadow-md z-10 overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Tiny headshot of a male employee wearing a hard hat, cropped tightly, high key lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCKjd6t-DO5apct63UJ_zMqwShXt7eiHXrU6raDkf24Ksxrm4KLnwRmWi_lFuIsWJSBd-s7cW75U5kJT8HnyPCdo9ZMRT7SLFC9SQrQRi8-r1j66LriAoZlE4Jh6rrEbUSJYZXOLpykqiddWJ57gIULB2VN61ip72s2vI_bEzLK--NMOF7kLzOdHjvsqJNtCvTeEmaANBgLD2dCAmvQ1-tXCVHUz2m4Ik0kXk4xnOepYdgR8hexNW2Y"/>
+</div>
+</div>
+<div class="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-white px-2 py-1 rounded shadow text-xs font-bold whitespace-nowrap hidden group-hover:block z-20 pointer-events-none">
+                    T. Anderson
+                </div>
+</div>
+<!-- Marker 2: Outside (Amber) -->
+<div class="absolute top-[45%] left-[60%] group cursor-pointer" onclick="toggleDetails('employee-2')">
+<div class="relative flex items-center justify-center w-8 h-8">
+<div class="relative bg-white border-2 border-amber-500 rounded-full w-8 h-8 flex items-center justify-center shadow-md z-10 overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Tiny headshot of a female employee in a uniform, confident expression, light background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAwd4rVzGWDynrQqf7YzdqRJsRXtzPUN5cNDbuqeaOT4rnodqbUIRcMfk4udb9-cf2RpAPEf6F6F0PwlTfr4PP6XLvmOf7RlrV8eP61NIQAkbCGFmMT1wNmAhiGLlEkZoKK351VvtfIMLXGThL77Ca7gJmIgGBQ4PwUZPZeND8F4J6tjmwJWUOs28Ai8IPmgw2fSW1uFEOGNmBXTRp-VA5zDfF-JCtZyLiPbeVSvvbR-Lbo1xLHzZIP"/>
+</div>
+</div>
+<div class="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-white px-2 py-1 rounded shadow text-xs font-bold whitespace-nowrap hidden group-hover:block z-20 pointer-events-none">
+                    M. Davis
+                </div>
+</div>
+<!-- Marker 3: Offline (Red) -->
+<div class="absolute top-[60%] left-[20%] group cursor-pointer opacity-70 grayscale" onclick="toggleDetails('employee-3')">
+<div class="relative flex items-center justify-center w-8 h-8">
+<div class="relative bg-white border-2 border-red-500 rounded-full w-8 h-8 flex items-center justify-center shadow-md z-10 overflow-hidden">
+<span class="material-symbols-outlined text-[16px] text-gray-500" data-icon="person_off">person_off</span>
+</div>
+</div>
+<div class="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-white px-2 py-1 rounded shadow text-xs font-bold whitespace-nowrap hidden group-hover:block z-20 pointer-events-none">
+                    K. Patel (Offline)
+                </div>
+</div>
+<!-- Live Feed Overlay (Bottom Left) -->
+<div class="absolute bottom-6 left-6 w-80 bg-surface-container-lowest/95 backdrop-blur-sm rounded-lg shadow-[0_4px_6px_-1px_rgb(0_0_0_/_0.1)] border border-outline-variant z-20 overflow-hidden flex flex-col max-h-[300px]">
+<div class="bg-surface-container-low px-4 py-2 border-b border-outline-variant flex justify-between items-center">
+<h3 class="font-label-md text-label-md font-bold text-on-surface flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                        Live Event Feed
+                    </h3>
+<button class="text-on-surface-variant hover:text-primary"><span class="material-symbols-outlined text-[16px]" data-icon="filter_list">filter_list</span></button>
+</div>
+<div class="overflow-y-auto flex-1 p-0">
+<ul class="divide-y divide-outline-variant">
+<li class="p-3 hover:bg-surface-container transition-colors text-sm">
+<div class="flex justify-between items-start mb-1">
+<span class="font-bold text-on-surface text-xs">T. Anderson</span>
+<span class="text-[10px] text-outline">Just now</span>
+</div>
+<p class="text-xs text-on-surface-variant">Entered <span class="font-semibold text-blue-600">Alpha Facility Zone</span></p>
+</li>
+<li class="p-3 hover:bg-surface-container transition-colors text-sm">
+<div class="flex justify-between items-start mb-1">
+<span class="font-bold text-on-surface text-xs">M. Davis</span>
+<span class="text-[10px] text-outline">2m ago</span>
+</div>
+<p class="text-xs text-on-surface-variant">GPS ping recorded 0.5km outside geofence.</p>
+</li>
+<li class="p-3 hover:bg-surface-container transition-colors text-sm bg-red-50/50">
+<div class="flex justify-between items-start mb-1">
+<span class="font-bold text-error text-xs">K. Patel</span>
+<span class="text-[10px] text-outline">15m ago</span>
+</div>
+<p class="text-xs text-error">Signal lost. Last known location saved.</p>
+</li>
+<li class="p-3 hover:bg-surface-container transition-colors text-sm">
+<div class="flex justify-between items-start mb-1">
+<span class="font-bold text-on-surface text-xs">System</span>
+<span class="text-[10px] text-outline">20m ago</span>
+</div>
+<p class="text-xs text-on-surface-variant">Shift 'Morning' approaching end.</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<!-- Employee Details Drawer (Right Side) -->
+<div class="absolute top-[104px] right-0 bottom-0 w-[400px] bg-surface-container-lowest border-l border-outline-variant shadow-[0_0_15px_rgba(0,0,0,0.1)] transform translate-x-full transition-transform duration-300 ease-in-out z-40 flex flex-col" id="details-panel">
+<!-- Drawer Header -->
+<div class="px-6 py-4 border-b border-outline-variant flex justify-between items-center bg-surface-container-low">
+<h2 class="font-headline-md text-headline-md font-semibold text-on-surface">Employee Details</h2>
+<button class="p-1.5 rounded-full hover:bg-surface-container-high text-on-surface-variant transition-colors" onclick="closeDetails()">
+<span class="material-symbols-outlined" data-icon="close">close</span>
+</button>
+</div>
+<!-- Drawer Content -->
+<div class="flex-1 overflow-y-auto p-6">
+<!-- Profile Header -->
+<div class="flex items-start gap-4 mb-8">
+<img alt="Profile Photo" class="w-20 h-20 rounded-lg object-cover border border-outline-variant shadow-sm" data-alt="Professional corporate headshot of a male security employee wearing a standard uniform. Clear, bright lighting, light grey background, looking directly at the camera with a neutral, professional expression." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBvU0N_wbbjESWVL7P4Ey6-woZBcIMSsFO9NJKQeU3O7bwn2tNa9vB4Ke52MDM75LdiWmSugbXXvRkknuilyBQAlN4NufVzi_cNjo3WPxq8E2vb9OpSrYFP2D9FuRa95nxyMWNoltgz78hLOLcAZPVDeWwbEe_XaAZajiZQeS11n6S19MowSCllWd5bxHnwI3OI3d2Y-gprgIhfyV0FZi1Jk-2yZq0zJvvUGXriRSGTChoztm2m3hBv"/>
+<div class="flex-1">
+<div class="flex justify-between items-start">
+<h3 class="font-headline-md text-headline-md text-on-surface">Thomas Anderson</h3>
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-green-100 text-green-800 border border-green-200">
+<span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                                Inside Site
+                            </span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">ID: EMP-84920</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Role: Security Officer II</p>
+</div>
+</div>
+<!-- Bento Grid Info -->
+<div class="grid grid-cols-2 gap-4 mb-8">
+<div class="col-span-2 bg-surface rounded-lg p-4 border border-outline-variant">
+<h4 class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-2">Assignment</h4>
+<div class="flex items-center gap-3">
+<div class="p-2 bg-blue-100 rounded text-blue-700">
+<span class="material-symbols-outlined" data-icon="corporate_fare">corporate_fare</span>
+</div>
+<div>
+<p class="font-body-md text-body-md font-semibold text-on-surface">Alpha Facility Zone</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Distance: 0.0km (On-site)</p>
+</div>
+</div>
+</div>
+<div class="bg-surface rounded-lg p-4 border border-outline-variant">
+<h4 class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-2">Current Shift</h4>
+<div class="flex items-center gap-2 mb-1">
+<span class="material-symbols-outlined text-[16px] text-outline" data-icon="schedule">schedule</span>
+<span class="font-body-md text-body-md font-semibold text-on-surface">Morning</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">06:00 - 14:00</p>
+<div class="w-full bg-surface-variant h-1.5 rounded-full mt-3 overflow-hidden">
+<div class="bg-primary h-full w-[75%]"></div>
+</div>
+<p class="text-[10px] text-right text-outline mt-1">2h remaining</p>
+</div>
+<div class="bg-surface rounded-lg p-4 border border-outline-variant">
+<h4 class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-2">Supervisor</h4>
+<div class="flex items-center gap-2 mt-2">
+<div class="w-8 h-8 rounded-full bg-tertiary-container flex items-center justify-center text-on-tertiary-container font-bold text-xs">
+                                JD
+                            </div>
+<div>
+<p class="font-body-sm text-body-sm font-semibold text-on-surface">Jane Doe</p>
+<a class="text-[10px] text-primary hover:underline" href="#">Message</a>
+</div>
+</div>
+</div>
+</div>
+<!-- Device Health -->
+<h4 class="font-label-md text-label-md font-semibold text-on-surface mb-3 flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]" data-icon="important_devices">important_devices</span>
+                    Device Health
+                </h4>
+<div class="bg-surface rounded-lg border border-outline-variant divide-y divide-outline-variant">
+<div class="p-3 flex justify-between items-center">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-green-600" data-icon="battery_5_bar">battery_5_bar</span>
+<span class="font-body-sm text-body-sm text-on-surface">Battery</span>
+</div>
+<span class="font-body-sm text-body-sm font-semibold text-on-surface">85%</span>
+</div>
+<div class="p-3 flex justify-between items-center">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-blue-600" data-icon="my_location">my_location</span>
+<span class="font-body-sm text-body-sm text-on-surface">GPS Signal</span>
+</div>
+<span class="font-body-sm text-body-sm font-semibold text-on-surface">High Accuracy</span>
+</div>
+<div class="p-3 flex justify-between items-center">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-blue-600" data-icon="signal_cellular_alt">signal_cellular_alt</span>
+<span class="font-body-sm text-body-sm text-on-surface">Network</span>
+</div>
+<span class="font-body-sm text-body-sm font-semibold text-on-surface">4G LTE</span>
+</div>
+<div class="p-3 flex justify-between items-center bg-surface-container-low">
+<span class="font-body-sm text-body-sm text-outline">Last Sync</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Just now</span>
+</div>
+</div>
+</div>
+<!-- Drawer Footer -->
+<div class="p-4 border-t border-outline-variant bg-surface flex gap-3">
+<button class="flex-1 bg-white border border-outline-variant text-on-surface hover:bg-surface-container-low font-label-md py-2 rounded transition-colors shadow-sm">
+                    View History
+                </button>
+<button class="flex-1 bg-primary text-on-primary hover:bg-primary/90 font-label-md py-2 rounded transition-colors shadow-sm">
+                    Contact
+                </button>
+</div>
+</div>
+</div>
+<!-- Minimal Script for Interactions -->
+<script>
+        const detailsPanel = document.getElementById('details-panel');
+        
+        function toggleDetails(empId) {
+            // In a real app, we'd fetch data based on empId here.
+            // For now, just slide the panel in.
+            detailsPanel.classList.remove('translate-x-full');
+        }
+
+        function closeDetails() {
+            detailsPanel.classList.add('translate-x-full');
+        }
+    </script>
+</body></html>

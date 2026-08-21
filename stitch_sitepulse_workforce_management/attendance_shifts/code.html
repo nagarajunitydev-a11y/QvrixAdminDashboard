@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Attendance &amp; Shifts Reporting</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-container": "#5e6e85",
+                        "on-surface-variant": "#434655",
+                        "primary-fixed": "#dbe1ff",
+                        "on-background": "#191c1e",
+                        "on-error-container": "#93000a",
+                        "error": "#ba1a1a",
+                        "surface-dim": "#d8dadc",
+                        "on-primary": "#ffffff",
+                        "tertiary-fixed-dim": "#b7c8e1",
+                        "on-secondary-fixed": "#111c2d",
+                        "on-tertiary-container": "#e9f0ff",
+                        "surface-variant": "#e0e3e5",
+                        "on-surface": "#191c1e",
+                        "secondary": "#545f73",
+                        "primary-fixed-dim": "#b4c5ff",
+                        "on-secondary-fixed-variant": "#3c475a",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "primary-container": "#2563eb",
+                        "secondary-container": "#d5e0f8",
+                        "tertiary": "#46566c",
+                        "on-tertiary-fixed": "#0b1c30",
+                        "secondary-fixed-dim": "#bcc7de",
+                        "inverse-primary": "#b4c5ff",
+                        "outline": "#737686",
+                        "secondary-fixed": "#d8e3fb",
+                        "primary": "#004ac6",
+                        "outline-variant": "#c3c6d7",
+                        "on-primary-container": "#eeefff",
+                        "tertiary-fixed": "#d3e4fe",
+                        "on-error": "#ffffff",
+                        "surface-bright": "#f7f9fb",
+                        "surface-container-high": "#e6e8ea",
+                        "surface-container-low": "#f2f4f6",
+                        "inverse-surface": "#2d3133",
+                        "inverse-on-surface": "#eff1f3",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container": "#eceef0",
+                        "on-tertiary-fixed-variant": "#38485d",
+                        "background": "#f7f9fb",
+                        "on-primary-fixed": "#00174b",
+                        "surface-tint": "#0053db",
+                        "surface-container-highest": "#e0e3e5",
+                        "on-secondary-container": "#586377",
+                        "on-primary-fixed-variant": "#003ea8",
+                        "error-container": "#ffdad6",
+                        "surface": "#f7f9fb"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-sm": "8px",
+                        "base": "4px",
+                        "stack-lg": "24px",
+                        "stack-md": "16px",
+                        "section-padding": "32px",
+                        "gutter": "16px",
+                        "container-margin": "24px"
+                    },
+                    "fontFamily": {
+                        "headline-lg-mobile": ["Hanken Grotesk"],
+                        "headline-md": ["Hanken Grotesk"],
+                        "label-sm": ["Geist"],
+                        "body-md": ["Inter"],
+                        "label-md": ["Geist"],
+                        "display-lg": ["Hanken Grotesk"],
+                        "headline-lg": ["Hanken Grotesk"],
+                        "body-sm": ["Inter"],
+                        "body-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "label-sm": ["11px", { "lineHeight": "14px", "fontWeight": "600" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "display-lg": ["36px", { "lineHeight": "44px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-lg": ["28px", { "lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "body-sm": ["13px", { "lineHeight": "18px", "fontWeight": "400" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@600;700&amp;family=Geist:wght@500;600&amp;family=Inter:wght@400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body-md h-screen flex overflow-hidden">
+<!-- SideNavBar -->
+<nav class="hidden md:flex flex-col h-screen w-64 fixed left-0 top-0 bg-[#1e293b] z-50">
+<div class="p-6">
+<h1 class="font-headline-md text-headline-md font-bold text-white mb-1">Mission Control</h1>
+<p class="font-label-sm text-label-sm text-[#94a3b8]">Workforce Logistics</p>
+</div>
+<div class="flex-1 overflow-y-auto">
+<ul class="flex flex-col space-y-1 py-4">
+<li>
+<a class="flex items-center px-6 py-3 text-[#94a3b8] hover:bg-[#334155] hover:text-white transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-3">dashboard</span>
+<span class="font-label-md text-label-md">Dashboard</span>
+</a>
+</li>
+<li>
+<a class="flex items-center px-6 py-3 text-[#94a3b8] hover:bg-[#334155] hover:text-white transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-3">location_on</span>
+<span class="font-label-md text-label-md">Live Tracking</span>
+</a>
+</li>
+<li>
+<a class="flex items-center px-6 py-3 text-[#94a3b8] hover:bg-[#334155] hover:text-white transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-3">group</span>
+<span class="font-label-md text-label-md">Employees</span>
+</a>
+</li>
+<li>
+<a class="flex items-center px-6 py-3 text-[#94a3b8] hover:bg-[#334155] hover:text-white transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-3">domain</span>
+<span class="font-label-md text-label-md">Sites</span>
+</a>
+</li>
+<li class="relative">
+<a class="flex items-center px-6 py-3 bg-[#334155] text-white border-l-4 border-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-3" style="font-variation-settings: 'FILL' 1;">event_available</span>
+<span class="font-label-md text-label-md font-bold">Attendance</span>
+</a>
+</li>
+<li>
+<a class="flex items-center px-6 py-3 text-[#94a3b8] hover:bg-[#334155] hover:text-white transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-3">schedule</span>
+<span class="font-label-md text-label-md">Shifts</span>
+</a>
+</li>
+<li>
+<a class="flex items-center px-6 py-3 text-[#94a3b8] hover:bg-[#334155] hover:text-white transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-3">history</span>
+<span class="font-label-md text-label-md">History</span>
+</a>
+</li>
+<li>
+<a class="flex items-center px-6 py-3 text-[#94a3b8] hover:bg-[#334155] hover:text-white transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-3">notifications_active</span>
+<span class="font-label-md text-label-md">Alerts</span>
+</a>
+</li>
+<li>
+<a class="flex items-center px-6 py-3 text-[#94a3b8] hover:bg-[#334155] hover:text-white transition-colors duration-200" href="#">
+<span class="material-symbols-outlined mr-3">settings</span>
+<span class="font-label-md text-label-md">Settings</span>
+</a>
+</li>
+</ul>
+</div>
+<div class="p-6 border-t border-[#334155] flex items-center">
+<img alt="Admin Avatar" class="w-8 h-8 rounded-full mr-3 object-cover" data-alt="A small circular avatar of a modern professional in a sleek, high-tech corporate office setting, bright and clean." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCwE40t2hH9W_LNd3VfBHI75sNG615p7v3HmbPxcAc5LCFXQ3vy6vHon68TdnJUk3-tlQ3unqyetENQocyFXlKHUkMwSseKA99r07ijLzK9Hym8Wv-p0AwvqpZgiDtN-sgM66Xp8vJbsut8DS7npM1fqTZ9R2gIjcul_m94BjaquBxVdutwoCTz-3DhJ4jurmTVFAX9oK6hws7LqMphDielTh4EZ8LnCoSWn1uspOgZfjwfj5sKifHb"/>
+<div>
+<p class="font-label-sm text-label-sm text-white">Admin User</p>
+<p class="font-label-sm text-label-sm text-[#94a3b8]">System Admin</p>
+</div>
+</div>
+</nav>
+<!-- Main Content Area -->
+<div class="flex-1 flex flex-col md:ml-64 w-full h-screen overflow-hidden bg-background">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center h-16 px-6 w-full bg-surface-container-lowest border-b border-outline-variant shadow-sm z-40 transition-all duration-150">
+<div class="flex items-center">
+<h2 class="font-headline-md text-headline-md font-semibold text-on-surface">Admin Console</h2>
+</div>
+<div class="flex-1 max-w-md mx-8 hidden md:block">
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">search</span>
+<input class="w-full pl-10 pr-4 py-2 bg-surface-container-low border border-outline-variant rounded focus:border-primary focus:ring focus:ring-primary/20 font-body-md text-body-md text-on-surface placeholder-on-surface-variant transition-colors" placeholder="Search employees, sites..." type="text"/>
+</div>
+</div>
+<div class="flex items-center space-x-4">
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-low rounded-full transition-colors relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-1 right-1 w-2 h-2 bg-error rounded-full"></span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-low rounded-full transition-colors hidden sm:block">
+<span class="material-symbols-outlined">help_outline</span>
+</button>
+<div class="h-6 w-px bg-outline-variant mx-2 hidden sm:block"></div>
+<button class="font-label-md text-label-md text-on-surface-variant hover:text-on-surface hidden sm:block">Settings</button>
+<button class="flex items-center space-x-2">
+<img alt="Admin User Profile" class="w-8 h-8 rounded-full object-cover border border-outline-variant" data-alt="A small circular avatar of a modern professional in a sleek, high-tech corporate office setting, bright and clean." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA78l8kEN89W1-t_yg6y-qA6cupZV8zbbdT7DN5lOPLa07w-sJbkjxKqsI_zkU0Gpy4MgzOV_0-l1dJjL2HQ_AVfA6bnv8Gm__rKxkcy6b2tRc1RCdN2VFHYlfrL7qyXv3MaMVvBiU_4bAcXTpYFN0MB3yriaC59pjgPMOTx11RVrPkd2XchY7Ys6y-Y6ckmAo1sygLIdrHOguh5URkWjLTdU7f5-lCalv08e-gLQPmKjxsyuKMSjWB"/>
+</button>
+</div>
+</header>
+<!-- Canvas -->
+<main class="flex-1 overflow-y-auto p-container-margin">
+<div class="max-w-7xl mx-auto space-y-stack-lg">
+<!-- Page Header & Actions -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+<div>
+<h1 class="font-headline-lg text-headline-lg text-on-surface">Attendance &amp; Shifts Reporting</h1>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">Analyze workforce punctuality and shift adherence.</p>
+</div>
+<div class="flex items-center gap-3">
+<button class="flex items-center px-4 py-2 bg-white border border-[#e2e8f0] rounded text-[#1e293b] font-label-md text-label-md hover:bg-surface-container-low transition-colors shadow-sm">
+<span class="material-symbols-outlined mr-2 text-[18px]">download</span>
+                            Export CSV
+                        </button>
+<button class="flex items-center px-4 py-2 bg-[#2563eb] border border-transparent rounded text-white font-label-md text-label-md hover:bg-blue-700 transition-colors shadow-sm relative overflow-hidden group">
+<div class="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity rounded"></div>
+<span class="material-symbols-outlined mr-2 text-[18px]">picture_as_pdf</span>
+                            Export PDF
+                        </button>
+</div>
+</div>
+<!-- Filters & Summary Bento Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+<!-- Date Range Picker Card (Spans 4 columns on large screens) -->
+<div class="lg:col-span-4 bg-white border border-[#e2e8f0] rounded-lg p-6 flex flex-col justify-between">
+<div>
+<h3 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider mb-4">Date Range</h3>
+<div class="flex flex-wrap gap-2 mb-4">
+<button class="px-3 py-1.5 bg-surface-container-low rounded border border-outline-variant text-on-surface font-label-sm text-label-sm hover:bg-surface-container-high transition-colors">Daily</button>
+<button class="px-3 py-1.5 bg-[#2563eb] rounded border border-transparent text-white font-label-sm text-label-sm shadow-sm">Weekly</button>
+<button class="px-3 py-1.5 bg-surface-container-low rounded border border-outline-variant text-on-surface font-label-sm text-label-sm hover:bg-surface-container-high transition-colors">Monthly</button>
+<button class="px-3 py-1.5 bg-surface-container-low rounded border border-outline-variant text-on-surface font-label-sm text-label-sm hover:bg-surface-container-high transition-colors">Custom</button>
+</div>
+</div>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">calendar_today</span>
+<input class="w-full pl-10 pr-4 py-2.5 bg-white border border-[#e2e8f0] rounded focus:border-[#2563eb] focus:ring focus:ring-blue-500/20 font-body-md text-body-md text-on-surface cursor-pointer" readonly="" type="text" value="Oct 16 - Oct 22, 2023"/>
+</div>
+</div>
+<!-- Summary Cards (Span 8 columns total) -->
+<div class="lg:col-span-8 grid grid-cols-1 sm:grid-cols-2 gap-6">
+<!-- Compliance Card -->
+<div class="bg-white border border-[#e2e8f0] rounded-lg p-6 relative overflow-hidden group">
+<!-- Subtle decoration -->
+<div class="absolute -right-4 -top-4 w-24 h-24 bg-primary/5 rounded-full blur-xl group-hover:bg-primary/10 transition-colors"></div>
+<h3 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider mb-2">Average Shift Compliance</h3>
+<div class="flex items-end justify-between mt-4">
+<div>
+<span class="font-display-lg text-display-lg text-on-surface">94.2%</span>
+</div>
+<div class="flex flex-col items-end">
+<div class="flex items-center text-green-600 bg-green-50 px-2 py-1 rounded mb-2">
+<span class="material-symbols-outlined text-[16px] mr-1">trending_up</span>
+<span class="font-label-sm text-label-sm">+2.1% vs last week</span>
+</div>
+<!-- Sparkline placeholder using gradient -->
+<div class="w-24 h-8 bg-gradient-to-r from-transparent via-green-100 to-green-200 rounded-sm relative flex items-end">
+<div class="absolute bottom-0 left-0 w-full h-full border-b-2 border-green-500 rounded-b-sm" style="clip-path: polygon(0 100%, 20% 80%, 40% 90%, 60% 40%, 80% 60%, 100% 20%, 100% 100%); background-color: rgba(34, 197, 94, 0.2);"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Late Clock-ins Card -->
+<div class="bg-white border border-[#e2e8f0] rounded-lg p-6 relative overflow-hidden group">
+<!-- Subtle decoration -->
+<div class="absolute -right-4 -top-4 w-24 h-24 bg-error/5 rounded-full blur-xl group-hover:bg-error/10 transition-colors"></div>
+<h3 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider mb-2">Total Late Clock-ins</h3>
+<div class="flex items-end justify-between mt-4">
+<div>
+<span class="font-display-lg text-display-lg text-on-surface">47</span>
+</div>
+<div class="flex flex-col items-end">
+<div class="flex items-center text-error bg-error-container px-2 py-1 rounded mb-2">
+<span class="material-symbols-outlined text-[16px] mr-1">trending_down</span>
+<span class="font-label-sm text-label-sm">-12 vs last week</span>
+</div>
+<!-- Sparkline placeholder -->
+<div class="w-24 h-8 bg-gradient-to-r from-transparent via-red-50 to-red-100 rounded-sm relative flex items-end">
+<div class="absolute bottom-0 left-0 w-full h-full border-b-2 border-red-500 rounded-b-sm" style="clip-path: polygon(0 20%, 20% 40%, 40% 30%, 60% 70%, 80% 50%, 100% 90%, 100% 100%, 0 100%); background-color: rgba(239, 68, 68, 0.2);"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Detailed Attendance Table -->
+<div class="bg-white border border-[#e2e8f0] rounded-lg overflow-hidden flex flex-col">
+<div class="p-4 border-b border-[#e2e8f0] flex justify-between items-center bg-[#f8fafc]">
+<h3 class="font-headline-md text-headline-md text-on-surface">Attendance Records</h3>
+<div class="flex items-center gap-3">
+<div class="relative hidden sm:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">filter_list</span>
+<select class="pl-9 pr-8 py-1.5 bg-white border border-[#e2e8f0] rounded focus:border-[#2563eb] focus:ring focus:ring-blue-500/20 font-body-sm text-body-sm text-on-surface appearance-none cursor-pointer">
+<option>All Statuses</option>
+<option>On Time</option>
+<option>Late</option>
+<option>Absent</option>
+</select>
+</div>
+<button class="p-1.5 text-on-surface-variant hover:bg-surface-container-low rounded border border-transparent hover:border-[#e2e8f0] transition-colors">
+<span class="material-symbols-outlined text-[20px]">more_vert</span>
+</button>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-[#f1f5f9] border-b border-[#e2e8f0]">
+<th class="px-4 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Employee</th>
+<th class="px-4 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Date</th>
+<th class="px-4 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Shift</th>
+<th class="px-4 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Clock In</th>
+<th class="px-4 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Clock Out</th>
+<th class="px-4 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Duration</th>
+<th class="px-4 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Time on Site</th>
+<th class="px-4 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Status</th>
+</tr>
+</thead>
+<tbody class="font-body-sm text-body-sm text-on-surface">
+<!-- Row 1 -->
+<tr class="border-b border-[#e2e8f0] hover:bg-[#f0f7ff] transition-colors">
+<td class="px-4 py-3">
+<div class="flex items-center">
+<div class="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-label-sm text-label-sm mr-3">JD</div>
+<span class="font-medium">John Doe</span>
+</div>
+</td>
+<td class="px-4 py-3 text-on-surface-variant">Oct 20, 2023</td>
+<td class="px-4 py-3">Morning (06:00 - 14:00)</td>
+<td class="px-4 py-3">05:55 AM</td>
+<td class="px-4 py-3">02:10 PM</td>
+<td class="px-4 py-3">8h 15m</td>
+<td class="px-4 py-3 text-on-surface-variant">8h 20m</td>
+<td class="px-4 py-3">
+<span class="inline-flex items-center px-2 py-1 rounded bg-green-50 text-green-700 font-label-sm text-label-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5"></span>
+                                            ON TIME
+                                        </span>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="border-b border-[#e2e8f0] hover:bg-[#f0f7ff] transition-colors">
+<td class="px-4 py-3">
+<div class="flex items-center">
+<div class="w-8 h-8 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center font-label-sm text-label-sm mr-3">AS</div>
+<span class="font-medium">Alice Smith</span>
+</div>
+</td>
+<td class="px-4 py-3 text-on-surface-variant">Oct 20, 2023</td>
+<td class="px-4 py-3">Morning (06:00 - 14:00)</td>
+<td class="px-4 py-3 text-error">06:45 AM</td>
+<td class="px-4 py-3">02:00 PM</td>
+<td class="px-4 py-3">7h 15m</td>
+<td class="px-4 py-3 text-on-surface-variant">7h 20m</td>
+<td class="px-4 py-3">
+<span class="inline-flex items-center px-2 py-1 rounded bg-orange-50 text-orange-700 font-label-sm text-label-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-orange-500 mr-1.5"></span>
+                                            LATE
+                                        </span>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="border-b border-[#e2e8f0] hover:bg-[#f0f7ff] transition-colors">
+<td class="px-4 py-3">
+<div class="flex items-center">
+<div class="w-8 h-8 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center font-label-sm text-label-sm mr-3">RJ</div>
+<span class="font-medium">Robert Jones</span>
+</div>
+</td>
+<td class="px-4 py-3 text-on-surface-variant">Oct 20, 2023</td>
+<td class="px-4 py-3">Evening (14:00 - 22:00)</td>
+<td class="px-4 py-3 text-on-surface-variant">--:--</td>
+<td class="px-4 py-3 text-on-surface-variant">--:--</td>
+<td class="px-4 py-3">0h 0m</td>
+<td class="px-4 py-3 text-on-surface-variant">0h 0m</td>
+<td class="px-4 py-3">
+<span class="inline-flex items-center px-2 py-1 rounded bg-red-50 text-red-700 font-label-sm text-label-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-red-500 mr-1.5"></span>
+                                            ABSENT
+                                        </span>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="border-b border-[#e2e8f0] hover:bg-[#f0f7ff] transition-colors">
+<td class="px-4 py-3">
+<div class="flex items-center">
+<div class="w-8 h-8 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center font-label-sm text-label-sm mr-3">EW</div>
+<span class="font-medium">Emma Wilson</span>
+</div>
+</td>
+<td class="px-4 py-3 text-on-surface-variant">Oct 20, 2023</td>
+<td class="px-4 py-3">Evening (14:00 - 22:00)</td>
+<td class="px-4 py-3">01:50 PM</td>
+<td class="px-4 py-3">10:05 PM</td>
+<td class="px-4 py-3">8h 15m</td>
+<td class="px-4 py-3 text-on-surface-variant">8h 30m</td>
+<td class="px-4 py-3">
+<span class="inline-flex items-center px-2 py-1 rounded bg-green-50 text-green-700 font-label-sm text-label-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5"></span>
+                                            ON TIME
+                                        </span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination -->
+<div class="p-4 border-t border-[#e2e8f0] bg-white flex items-center justify-between">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Showing 1 to 4 of 248 entries</span>
+<div class="flex items-center space-x-2">
+<button class="px-3 py-1 border border-[#e2e8f0] rounded text-on-surface-variant hover:bg-surface-container-low font-body-sm text-body-sm disabled:opacity-50" disabled="">Previous</button>
+<button class="px-3 py-1 bg-[#2563eb] text-white rounded font-body-sm text-body-sm">1</button>
+<button class="px-3 py-1 border border-[#e2e8f0] rounded text-on-surface hover:bg-surface-container-low font-body-sm text-body-sm">2</button>
+<button class="px-3 py-1 border border-[#e2e8f0] rounded text-on-surface hover:bg-surface-container-low font-body-sm text-body-sm">3</button>
+<span class="text-on-surface-variant">...</span>
+<button class="px-3 py-1 border border-[#e2e8f0] rounded text-on-surface hover:bg-surface-container-low font-body-sm text-body-sm">Next</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

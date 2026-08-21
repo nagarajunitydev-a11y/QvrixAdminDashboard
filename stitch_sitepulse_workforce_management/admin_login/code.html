@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Velocity Enterprise - Admin Login</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700&amp;family=Inter:wght@400&amp;family=Geist:wght@500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-fixed-variant": "#3c475a",
+                        "on-tertiary": "#ffffff",
+                        "error": "#ba1a1a",
+                        "error-container": "#ffdad6",
+                        "inverse-surface": "#2d3133",
+                        "on-error": "#ffffff",
+                        "on-primary-container": "#eeefff",
+                        "on-primary-fixed-variant": "#003ea8",
+                        "on-secondary": "#ffffff",
+                        "inverse-primary": "#b4c5ff",
+                        "surface-container-highest": "#e0e3e5",
+                        "surface-tint": "#0053db",
+                        "primary-fixed": "#dbe1ff",
+                        "on-tertiary-container": "#e9f0ff",
+                        "tertiary": "#46566c",
+                        "surface-dim": "#d8dadc",
+                        "surface-variant": "#e0e3e5",
+                        "tertiary-fixed-dim": "#b7c8e1",
+                        "tertiary-fixed": "#d3e4fe",
+                        "surface-container-high": "#e6e8ea",
+                        "primary-container": "#2563eb",
+                        "outline-variant": "#c3c6d7",
+                        "secondary-fixed": "#d8e3fb",
+                        "on-secondary-fixed": "#111c2d",
+                        "primary-fixed-dim": "#b4c5ff",
+                        "on-primary": "#ffffff",
+                        "on-surface": "#191c1e",
+                        "secondary-container": "#d5e0f8",
+                        "on-error-container": "#93000a",
+                        "on-surface-variant": "#434655",
+                        "tertiary-container": "#5e6e85",
+                        "surface-container-lowest": "#ffffff",
+                        "background": "#f7f9fb",
+                        "on-tertiary-fixed": "#0b1c30",
+                        "primary": "#004ac6",
+                        "secondary": "#545f73",
+                        "outline": "#737686",
+                        "surface-container": "#eceef0",
+                        "surface-bright": "#f7f9fb",
+                        "on-secondary-container": "#586377",
+                        "secondary-fixed-dim": "#bcc7de",
+                        "surface": "#f7f9fb",
+                        "on-background": "#191c1e",
+                        "surface-container-low": "#f2f4f6",
+                        "inverse-on-surface": "#eff1f3",
+                        "on-tertiary-fixed-variant": "#38485d",
+                        "on-primary-fixed": "#00174b"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "gutter": "16px",
+                        "section-padding": "32px",
+                        "stack-lg": "24px",
+                        "base": "4px",
+                        "container-margin": "24px",
+                        "stack-md": "16px",
+                        "stack-sm": "8px"
+                    },
+                    "fontFamily": {
+                        "display-lg": ["Hanken Grotesk"],
+                        "headline-lg-mobile": ["Hanken Grotesk"],
+                        "body-sm": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "label-md": ["Geist"],
+                        "headline-lg": ["Hanken Grotesk"],
+                        "headline-md": ["Hanken Grotesk"],
+                        "label-sm": ["Geist"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "display-lg": ["36px", { "lineHeight": "44px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "body-sm": ["13px", { "lineHeight": "18px", "fontWeight": "400" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "headline-lg": ["28px", { "lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "label-sm": ["11px", { "lineHeight": "14px", "fontWeight": "600" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-surface-container-low min-h-screen flex flex-col justify-center items-center p-gutter sm:p-container-margin">
+<!-- Login Container -->
+<main class="w-full max-w-[440px] bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant/30 overflow-hidden flex flex-col">
+<!-- Header -->
+<div class="px-section-padding pt-section-padding pb-stack-lg text-center flex flex-col items-center gap-stack-sm">
+<div class="flex items-center justify-center gap-2 mb-stack-sm text-primary">
+<span class="material-symbols-outlined text-[32px]">rocket_launch</span>
+</div>
+<h1 class="font-headline-lg text-headline-lg text-on-surface">Mission Control</h1>
+<p class="font-body-sm text-body-sm text-on-surface-variant uppercase tracking-wider">Velocity Enterprise</p>
+</div>
+<!-- Content -->
+<div class="px-section-padding pb-section-padding flex flex-col gap-stack-lg">
+<div class="text-center space-y-base">
+<h2 class="font-headline-md text-headline-md text-on-surface">Welcome back</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Enter your credentials to access the admin console.</p>
+</div>
+<!-- Form -->
+<form class="flex flex-col gap-stack-md" onsubmit="event.preventDefault();">
+<!-- Email Field -->
+<div class="flex flex-col gap-base">
+<label class="font-label-md text-label-md text-on-surface" for="email">Email Address</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">mail</span>
+<input class="w-full pl-10 pr-3 py-2 bg-surface-container-lowest border border-outline-variant rounded-lg font-body-md text-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all placeholder:text-outline/50" id="email" placeholder="admin@velocity.com" required="" type="email"/>
+</div>
+</div>
+<!-- Password Field -->
+<div class="flex flex-col gap-base">
+<label class="font-label-md text-label-md text-on-surface" for="password">Password</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">lock</span>
+<input class="w-full pl-10 pr-3 py-2 bg-surface-container-lowest border border-outline-variant rounded-lg font-body-md text-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all placeholder:text-outline/50" id="password" placeholder="••••••••" required="" type="password"/>
+</div>
+</div>
+<!-- Options -->
+<div class="flex items-center justify-between mt-stack-sm">
+<label class="flex items-center gap-2 cursor-pointer group">
+<input class="w-4 h-4 rounded text-primary bg-surface-container-lowest border-outline-variant focus:ring-primary focus:ring-offset-0" type="checkbox"/>
+<span class="font-body-sm text-body-sm text-on-surface-variant group-hover:text-on-surface transition-colors">Remember me</span>
+</label>
+<a class="font-label-sm text-label-sm text-primary hover:text-on-primary-fixed-variant transition-colors" href="#">Forgot password?</a>
+</div>
+<!-- Action -->
+<button class="w-full mt-stack-sm bg-primary hover:bg-on-primary-fixed-variant text-on-primary font-label-md text-label-md py-3 rounded-lg flex items-center justify-center gap-2 transition-all shadow-[inset_0_2px_4px_rgba(255,255,255,0.2)]" type="submit">
+<span>Sign In</span>
+<span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</button>
+</form>
+<!-- Signup Link -->
+<p class="text-center font-body-sm text-body-sm text-on-surface-variant pt-stack-sm border-t border-outline-variant/30">
+                Don't have an account? <a class="font-label-md text-label-md text-primary hover:underline" href="#">Sign up</a>
+</p>
+</div>
+</main>
+<!-- Footer -->
+<footer class="mt-stack-lg flex items-center justify-center gap-2 text-on-surface-variant/70">
+<span class="material-symbols-outlined text-[16px]">verified_user</span>
+<span class="font-label-sm text-label-sm uppercase tracking-widest">Secure Admin Access</span>
+</footer>
+</body></html>
