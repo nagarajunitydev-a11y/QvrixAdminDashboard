@@ -236,7 +236,9 @@ export async function deleteEmployee(id: string): Promise<void> {
 
 // Employee-Sites
 export async function fetchEmployeeSites(employeeId?: string): Promise<EmployeeSiteWithSite[]> {
-  let query = from('employee_sites').select('*, sites(id,name)')
+  let query = from('employee_sites')
+    .select('*, sites(id,name)')
+    .order('assigned_at', { ascending: false })
   if (employeeId) query = query.eq('employee_id', employeeId)
   const { data, error } = await query
   if (error) throw error
@@ -249,11 +251,17 @@ export async function assignEmployeeToSite(payload: EmployeeSiteInsert): Promise
 }
 
 export async function unassignEmployeeFromSite(employeeId: string, siteId: string): Promise<void> {
-  const { error } = await from('employee_sites')
+  const { data, error } = await from('employee_sites')
     .delete()
     .eq('employee_id', employeeId)
     .eq('site_id', siteId)
+    .select('employee_id')
   if (error) throw error
+  if (!data || data.length === 0) {
+    throw new Error(
+      'Assignment could not be deleted. It may have already been removed, or you lack permission to delete assignments.'
+    )
+  }
 }
 
 // Audit Logs

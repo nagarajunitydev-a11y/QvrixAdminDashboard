@@ -1,13 +1,17 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { format } from 'date-fns'
 import { fetchEmployeeSites, fetchEmployees, fetchSites, assignEmployeeToSite, unassignEmployeeFromSite } from '@/api/services'
-import { Employee, Site } from '@/types'
+import { Employee, Site, EmployeeSite } from '@/types'
 import { DataTable } from '@/components/ui/data-table'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Plus, Trash2, Users, MapPin } from 'lucide-react'
+
+type Feedback = { type: 'success' | 'error'; text: string }
 
 function initials(name: string) {
   return name
@@ -21,6 +25,7 @@ function initials(name: string) {
 
 export function AssignmentsPage() {
   const queryClient = useQueryClient()
+  const [feedback, setFeedback] = useState<Feedback | null>(null)
   const { data: assignments = [], isLoading } = useQuery({
     queryKey: ['employee-sites'],
     queryFn: () => fetchEmployeeSites(),
@@ -41,8 +46,16 @@ export function AssignmentsPage() {
 
   const handleUnassign = async (employeeId: string, siteId: string) => {
     if (!confirm('Unassign employee from this site?')) return
-    await unassignEmployeeFromSite(employeeId, siteId)
-    queryClient.invalidateQueries({ queryKey: ['employee-sites'] })
+    try {
+      await unassignEmployeeFromSite(employeeId, siteId)
+      setFeedback({ type: 'success', text: 'Assignment deleted successfully.' })
+      queryClient.invalidateQueries({ queryKey: ['employee-sites'] })
+    } catch (err) {
+      setFeedback({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Failed to delete assignment',
+      })
+    }
   }
 
   return (
@@ -53,6 +66,12 @@ export function AssignmentsPage() {
           Manage which employees are assigned to which sites.
         </p>
       </div>
+
+      {feedback && (
+        <Alert variant={feedback.type === 'error' ? 'destructive' : 'default'}>
+          <AlertDescription>{feedback.text}</AlertDescription>
+        </Alert>
+      )}
 
       <Card className="overflow-hidden">
         <CardHeader className="flex-row items-center justify-between space-y-0">
@@ -91,7 +110,9 @@ export function AssignmentsPage() {
               {
                 header: 'Assigned',
                 accessor: (row) => (
-                  <span className="font-label text-label-md text-muted-foreground">{row.assigned_at}</span>
+                  <span className="font-label text-label-md text-muted-foreground">
+                    {format(new Date(row.assigned_at), 'dd MMM yyyy, h:mm a')}
+                  </span>
                 ),
               },
               {
@@ -129,31 +150,59 @@ export function AssignmentsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <AssignmentForm employees={employees} sites={sites} />
+          <AssignmentForm employees={employees} sites={sites} assignments={assignments} />
         </CardContent>
       </Card>
     </div>
   )
 }
 
-function AssignmentForm({ employees, sites }: { employees: Employee[]; sites: Site[] }) {
+function AssignmentForm({
+  employees,
+  sites,
+  assignments,
+}: {
+  employees: Employee[]
+  sites: Site[]
+  assignments: EmployeeSite[]
+}) {
   const queryClient = useQueryClient()
   const [employeeId, setEmployeeId] = useState('')
   const [siteId, setSiteId] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
 
   const mutation = useMutation({
     mutationFn: async () => {
+      const duplicate = assignments.some(
+        (a) => a.employee_id === employeeId && a.site_id === siteId
+      )
+      if (duplicate) {
+        throw new Error('This employee already has an active assignment for this site.')
+      }
       await assignEmployeeToSite({ employee_id: employeeId, site_id: siteId })
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employee-sites'] })
       setEmployeeId('')
       setSiteId('')
+      setError(null)
+      setSuccess('Employee assigned successfully.')
+    },
+    onError: (err) => {
+      setSuccess(null)
+      const code = (err as { code?: string }).code
+      if (code === '23505' || /duplicate key/i.test(err.message)) {
+        setError('This employee already has an active assignment for this site.')
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to assign employee')
+      }
     },
   })
 
   return (
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+    <div className="space-y-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
       <div className="min-w-[200px] flex-1 space-y-1.5">
         <label className="font-label text-label-md text-foreground">Employee</label>
         <Select value={employeeId} onValueChange={setEmployeeId}>
@@ -190,6 +239,17 @@ function AssignmentForm({ employees, sites }: { employees: Employee[]; sites: Si
         <Plus className="h-4 w-4" />
         Assign
       </Button>
+      </div>
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+      {success && (
+        <Alert>
+          <AlertDescription>{success}</AlertDescription>
+        </Alert>
+      )}
     </div>
   )
 }
