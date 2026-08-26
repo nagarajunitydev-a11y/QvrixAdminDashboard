@@ -1,8 +1,12 @@
 import { Outlet } from 'react-router-dom'
 import { Navbar, Sidebar, useSidebarState } from '../components/Sidebar'
+import { useRouteDataRefresh } from '../hooks/useRouteDataRefresh'
 
 export function ManagerLayout() {
   const sidebar = useSidebarState()
+
+  // Refetch the selected page's data from Supabase on every menu click.
+  useRouteDataRefresh()
 
   return (
     <div className="h-screen overflow-hidden bg-background">

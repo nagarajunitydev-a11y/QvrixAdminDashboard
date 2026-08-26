@@ -1,5 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
+import { useIsFetching, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../api/AuthProvider'
+import { refreshPageData } from '../hooks/useRouteDataRefresh'
 import {
   LayoutDashboard,
   Users,
@@ -9,6 +11,7 @@ import {
   MapPin,
   Route,
   ClipboardList,
+  LoaderCircle,
   LogOut,
   Menu,
   Radar,
@@ -38,6 +41,9 @@ function initials(email: string | undefined) {
 
 export function Navbar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
   const { signOut, user } = useAuth()
+  // Any in-flight fetch belongs to the page currently mounted, so this doubles
+  // as the indicator for the refresh triggered by navigating to a menu item.
+  const isRefreshing = useIsFetching() > 0
 
   return (
     <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-border bg-card px-4 sm:px-6">
@@ -54,6 +60,16 @@ export function Navbar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
         </h1>
       </div>
       <div className="flex items-center gap-2 sm:gap-3">
+        {isRefreshing && (
+          <span
+            role="status"
+            aria-live="polite"
+            className="flex items-center gap-2 font-label text-label-sm text-muted-foreground"
+          >
+            <LoaderCircle className="h-4 w-4 animate-spin" />
+            <span className="hidden sm:inline">Refreshing…</span>
+          </span>
+        )}
         <span className="hidden font-label text-label-md text-muted-foreground md:block">
           {user?.email}
         </span>
@@ -81,6 +97,7 @@ export function Sidebar({
 }) {
   const location = useLocation()
   const { user, role } = useAuth()
+  const queryClient = useQueryClient()
 
   const nav = (
     <nav className="flex h-full w-64 shrink-0 flex-col bg-sidebar">
@@ -114,7 +131,11 @@ export function Sidebar({
             <li key={to}>
               <Link
                 to={to}
-                onClick={onClose}
+                onClick={() => {
+                  // Re-clicking the page you are already on still refreshes it.
+                  if (active) refreshPageData(queryClient, location.pathname)
+                  onClose?.()
+                }}
                 className={`flex items-center gap-3 rounded-sm border-l-4 px-3 py-2 font-label text-label-md transition-colors duration-200 ${
                   active
                     ? 'border-primary bg-sidebar-hover text-white'
