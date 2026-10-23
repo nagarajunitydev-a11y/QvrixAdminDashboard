@@ -1,6 +1,8 @@
+import { useOrganization } from '@/hooks/useOrganization'
+import { PageSkeleton } from '@/components/PageState'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { fetchAuditLogs } from '@/api/services'
+
 import { AuditLog } from '@/types'
 import { DataTable } from '@/components/ui/data-table'
 import { Card, CardContent } from '@/components/ui/card'
@@ -11,6 +13,8 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 export function AuditLogsPage() {
+  const { fetchAuditLogs } = useOrganization().services
+
   const [tableNameFilter, setTableNameFilter] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
 
@@ -20,11 +24,7 @@ export function AuditLogsPage() {
   })
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center py-16">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
-      </div>
-    )
+    return <PageSkeleton />
   }
 
   const filteredLogs = logs.filter(
@@ -59,13 +59,13 @@ export function AuditLogsPage() {
       <div className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap gap-3">
           <div className="min-w-[180px] flex-1 sm:max-w-64">
-            <Select value={tableNameFilter ?? ''} onValueChange={setTableNameFilter}>
+            <Select value={tableNameFilter ?? 'all'} onValueChange={value => setTableNameFilter(value === 'all' ? null : value)}>
               <SelectTrigger>
                 <Filter className="mr-2 h-4 w-4 shrink-0" />
                 <SelectValue placeholder="Filter by table" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All tables</SelectItem>
+                <SelectItem value="all">All tables</SelectItem>
                 <SelectItem value="employees">Employees</SelectItem>
                 <SelectItem value="departments">Departments</SelectItem>
                 <SelectItem value="designations">Designations</SelectItem>
@@ -122,6 +122,7 @@ export function AuditLogsPage() {
               },
               {
                 header: 'Time',
+                sortValue: row => new Date(row.created_at).getTime(),
                 accessor: (row: AuditLog) =>
                   formatDistanceToNow(new Date(row.created_at), { addSuffix: true }),
               },

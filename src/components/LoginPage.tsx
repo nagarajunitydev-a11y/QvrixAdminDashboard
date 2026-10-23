@@ -1,37 +1,49 @@
 import { useState, type FormEvent } from 'react'
+import { Brand } from './Brand'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../api/AuthProvider'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
 import { Alert, AlertDescription } from './ui/alert'
-import { Rocket, Mail, Lock, ArrowRight, ShieldCheck } from 'lucide-react'
+import {
+  Mail,
+  Lock,
+  ArrowRight,
+  ShieldCheck,
+  Eye,
+  EyeOff,
+  MapPin,
+  Users,
+  Activity,
+} from 'lucide-react'
 
 const REMEMBER_KEY = 'mc-remembered-email'
 
 export function LoginPage() {
-  const [email, setEmail] = useState(() => localStorage.getItem(REMEMBER_KEY) ?? '')
+  const [email, setEmail] = useState(
+    () => localStorage.getItem(REMEMBER_KEY) ?? '',
+  )
   const [password, setPassword] = useState('')
-  const [remember, setRemember] = useState(() => localStorage.getItem(REMEMBER_KEY) !== null)
+  const [remember, setRemember] = useState(
+    () => localStorage.getItem(REMEMBER_KEY) !== null,
+  )
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const { signIn } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/'
+  const from =
+    (location.state as { from?: { pathname: string } })?.from?.pathname || '/'
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError(null)
     setIsLoading(true)
     try {
-      const session = await signIn(email, password)
-      const role = session?.user?.user_metadata?.role?.toString() ?? null
-      if (role !== 'manager') {
-        setError('Access denied. Only managers can log in.')
-        return
-      }
+      await signIn(email, password)
       if (remember) {
         localStorage.setItem(REMEMBER_KEY, email)
       } else {
@@ -46,43 +58,74 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-muted p-4 sm:p-6">
-      <main className="flex w-full max-w-[440px] flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm">
-        <div className="flex flex-col items-center gap-2 px-8 pb-6 pt-8 text-center">
-          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <Rocket className="h-7 w-7" />
-          </div>
-          <h1 className="font-headline text-headline-lg text-foreground">Mission Control</h1>
-          <p className="font-label text-label-md uppercase tracking-widest text-muted-foreground">
-            Workforce Logistics
-          </p>
+    <div className="grid min-h-dvh lg:grid-cols-[1.05fr_1fr]">
+      <aside className="login-scene relative hidden overflow-hidden p-12 text-white lg:flex lg:flex-col xl:p-16">
+        <div className="login-grid pointer-events-none absolute inset-0" />
+        <div className="relative">
+          <Brand />
         </div>
-
-        <div className="flex flex-col gap-6 px-8 pb-8">
-          <div className="space-y-1 text-center">
-            <h2 className="font-headline text-headline-md text-foreground">Welcome back</h2>
-            <p className="text-body-md text-muted-foreground">
-              Enter your credentials to access the admin console.
-            </p>
+        <div className="relative my-auto py-16">
+          <span className="inline-flex items-center gap-2 rounded-full border border-teal-200/15 bg-teal-300/5 px-3 py-1.5 text-[10px] tracking-wider text-teal-200">
+            <span className="h-1.5 w-1.5 rounded-full bg-teal-300" />
+            WORKFORCE MANAGEMENT, REFINED
+          </span>
+          <h1 className="mt-7 max-w-lg font-headline text-[48px] font-medium leading-[1.13] tracking-[-.04em] xl:text-[58px]">
+            Your people.
+            <br />
+            Your operations.
+            <br />
+            <span className="text-teal-300">Perfectly in sync.</span>
+          </h1>
+          <p className="mt-6 max-w-sm text-sm leading-7 text-slate-400">
+            One clear view of your workforce. Bring your teams, locations, and
+            everyday operations together.
+          </p>
+          <div className="mt-10 grid max-w-md grid-cols-3 gap-4 border-t border-white/10 pt-6">
+            {[
+              { icon: MapPin, label: 'Location visibility' },
+              { icon: Users, label: 'Connected teams' },
+              { icon: Activity, label: 'Daily insights' },
+            ].map(({ icon: Icon, label }) => (
+              <div key={label}>
+                <Icon className="mb-3 h-5 w-5 text-teal-300/80" />
+                <span className="text-[10px] text-slate-400">{label}</span>
+              </div>
+            ))}
           </div>
-
-          <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
+        </div>
+        <p className="relative text-[10px] tracking-wide text-slate-500">
+          Crewtraxa Console <span className="mx-3">/</span> Every Team. Every
+          Site. In Sync.
+        </p>
+      </aside>
+      <main className="flex min-w-0 flex-col items-center justify-center bg-card px-6 py-12 sm:px-12">
+        <div className="mb-12 lg:hidden">
+          <Brand />
+        </div>
+        <div className="w-full max-w-[360px]">
+          <p className="eyebrow text-primary">WELCOME TO TRACKORA CONSOLE</p>
+          <h2 className="mt-3 font-headline text-[32px] font-semibold tracking-tight">
+            Good to see you again.
+          </h2>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+            Sign in to keep your workforce moving in sync.
+          </p>
+          <form className="mt-8 flex flex-col gap-5" onSubmit={handleSubmit}>
             {error && (
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="email" className="font-label text-label-md text-foreground">
-                Email Address
-              </Label>
+            <div className="space-y-2">
+              <Label htmlFor="email">Work email</Label>
               <div className="relative">
-                <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Mail className="pointer-events-none absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="email"
                   type="email"
-                  placeholder="admin@company.com"
-                  className="pl-10"
+                  autoComplete="username"
+                  placeholder="you@company.com"
+                  className="h-11 rounded-lg pl-10"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -90,51 +133,67 @@ export function LoginPage() {
                 />
               </div>
             </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="password" className="font-label text-label-md text-foreground">
-                Password
-              </Label>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
               <div className="relative">
-                <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Lock className="pointer-events-none absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  className="pl-10"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  placeholder="Enter your password"
+                  className="h-11 rounded-lg pl-10 pr-11"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   disabled={isLoading}
                 />
+                <button
+                  type="button"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPassword}
+                  className="absolute right-1.5 top-1.5 rounded-md p-2 text-muted-foreground"
+                  onClick={() => setShowPassword((v) => !v)}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
               </div>
             </div>
-
-            <label className="mt-1 flex cursor-pointer items-center gap-2 select-none">
+            <label className="flex cursor-pointer items-center gap-2">
               <input
                 type="checkbox"
                 checked={remember}
                 onChange={(e) => setRemember(e.target.checked)}
-                className="h-4 w-4 rounded border-input accent-primary"
+                className="h-3.5 w-3.5 rounded border-input accent-primary"
               />
-              <span className="text-body-sm text-muted-foreground transition-colors hover:text-foreground">
-                Remember me
+              <span className="text-xs text-muted-foreground">
+                Remember my email
               </span>
             </label>
-
-            <Button type="submit" className="mt-2 h-11 w-full rounded-lg" disabled={isLoading}>
-              <span>{isLoading ? 'Signing in…' : 'Sign In'}</span>
-              {!isLoading && <ArrowRight className="h-4 w-4" />}
+            <Button
+              type="submit"
+              className="mt-1 h-11 w-full rounded-lg"
+              disabled={isLoading}
+            >
+              <span>
+                {isLoading ? 'Signing in…' : 'Sign in to your workspace'}
+              </span>
+              {!isLoading && <ArrowRight className="ml-auto h-4 w-4" />}
             </Button>
           </form>
+          <div className="mt-8 flex items-center justify-center gap-2 border-t pt-6 text-[11px] text-muted-foreground">
+            <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+            Secure access for organization members
+          </div>
+          <p className="mt-12 text-center text-[10px] text-muted-foreground lg:hidden">
+            Every Team. Every Site. In Sync.
+          </p>
         </div>
       </main>
-
-      <footer className="mt-6 flex items-center justify-center gap-2 text-muted-foreground/70">
-        <ShieldCheck className="h-4 w-4" />
-        <span className="font-label text-label-sm uppercase tracking-widest">
-          Secure Admin Access
-        </span>
-      </footer>
     </div>
   )
 }

@@ -10,8 +10,6 @@ interface AuthContextType {
   loading: boolean
   signIn: (email: string, password: string) => Promise<Session | null>
   signOut: () => Promise<void>
-  isManager: boolean
-  role: string | null
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -29,8 +27,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const role = user?.user_metadata?.role?.toString() ?? null
-  const isManager = role === 'manager'
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -67,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ session, user, loading, signIn, signOut, isManager, role }}
+      value={{ session, user, loading, signIn, signOut }}
     >
       {children}
     </AuthContext.Provider>

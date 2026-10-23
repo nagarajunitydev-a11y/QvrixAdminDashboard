@@ -1,12 +1,9 @@
+import { useOrganization } from '@/hooks/useOrganization'
+import { PageSkeleton } from '@/components/PageState'
+import { useConfirm } from '@/hooks/useConfirm'
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import {
-  fetchDepartments,
-  fetchShifts,
-  createShift,
-  updateShift,
-  deleteShift,
-} from '@/api/services'
+
 import { Shift, ShiftInsert, ShiftUpdate } from '@/types'
 import { DataTable } from '@/components/ui/data-table'
 import { Button } from '@/components/ui/button'
@@ -20,7 +17,11 @@ import { Plus, Edit, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
 
 export function ShiftsPage() {
+  const { canManage } = useOrganization()
+  const { fetchDepartments, fetchShifts, createShift, updateShift, deleteShift } = useOrganization().services
+
   const queryClient = useQueryClient()
+  const confirm = useConfirm()
   const { data: shifts = [], isLoading } = useQuery({
     queryKey: ['shifts'],
     queryFn: fetchShifts,
@@ -67,7 +68,7 @@ export function ShiftsPage() {
   })
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this shift?')) return
+    if (!await confirm('Delete this shift?')) return
     try {
       await deleteShift(id)
       setError(null)
@@ -103,11 +104,7 @@ export function ShiftsPage() {
   }
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center py-16">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
-      </div>
-    )
+    return <PageSkeleton />
   }
 
   return (
@@ -117,7 +114,7 @@ export function ShiftsPage() {
           <h1 className="font-headline text-headline-lg text-foreground">Shifts</h1>
           <p className="mt-1 text-body-sm text-muted-foreground">Manage work shift definitions.</p>
         </div>
-        <Button onClick={handleAdd} className="shrink-0 gap-2">
+        <Button disabled={!canManage} onClick={handleAdd} className="shrink-0 gap-2">
           <Plus className="h-4 w-4" />
           Add Shift
         </Button>
@@ -153,10 +150,10 @@ export function ShiftsPage() {
               ...s,
               actions: (
                 <div className="flex justify-end gap-1">
-                  <Button size="icon" variant="ghost" title="Edit" onClick={() => handleEdit(s)}>
+                  <Button size="icon" variant="ghost" disabled={!canManage} title="Edit" onClick={() => handleEdit(s)}>
                     <Edit className="h-4 w-4" />
                   </Button>
-                  <Button size="icon" variant="ghost" title="Delete" className="hover:text-destructive" onClick={() => handleDelete(s.id)}>
+                  <Button size="icon" variant="ghost" disabled={!canManage} title="Delete" className="hover:text-destructive" onClick={() => handleDelete(s.id)}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
@@ -231,7 +228,7 @@ export function ShiftsPage() {
             </Button>
             <Button
               onClick={() => mutation.mutate()}
-              disabled={mutation.isPending || !name || !startTime || !endTime}
+              disabled={!canManage || mutation.isPending || !name || !startTime || !endTime}
             >
               {mutation.isPending ? 'Saving...' : 'Save'}
             </Button>

@@ -1,5 +1,7 @@
 {
   "name": "admindashboard",
+  "displayName": "Crewtraxa Console",
+  "description": "Crewtraxa Console \u2014 Every Team. Every Site. In Sync.",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -7,7 +9,14 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "typecheck": "tsc -b --pretty false",
+    "test:tenancy": "node scripts/test-tenancy.mjs && node scripts/test-organization-time.mjs && node scripts/test-database-deployment.mjs",
+    "test:tenancy:live": "node scripts/test-live-tenancy.mjs",
+    "test:ui": "playwright test",
+    "test:ui:live": "playwright test --config playwright.live.config.ts",
+    "db:preflight": "node scripts/database.mjs",
+    "db:migrate-organizations": "node scripts/database.mjs --apply"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.23",
@@ -20,6 +29,8 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
+    "date-fns-tz": "^3.2.0",
+    "leaflet": "^1.9.4",
     "lucide-react": "^0.400.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
@@ -29,12 +40,17 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.11",
+    "@playwright/test": "^1.64.1",
+    "@types/leaflet": "^1.9.22",
     "@types/node": "^24.13.3",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.4",
     "autoprefixer": "^10.5.4",
     "oxlint": "^1.75.0",
+    "pg": "^8.23.1",
     "postcss": "^8.5.26",
     "tailwindcss": "^3.4.19",
     "typescript": "~6.0.2",

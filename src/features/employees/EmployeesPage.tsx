@@ -1,19 +1,10 @@
+import { useOrganization } from '@/hooks/useOrganization'
+import { PageSkeleton } from '@/components/PageState'
+import { useConfirm } from '@/hooks/useConfirm'
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import {
-  fetchEmployees,
-  fetchDepartments,
-  fetchDesignations,
-  fetchShifts,
-  fetchSites,
-  createEmployee,
-  updateEmployee,
-  deleteEmployee,
-  fetchEmployeeSites,
-  assignEmployeeToSite,
-  unassignEmployeeFromSite,
-} from '@/api/services'
+
 import { Employee, EmployeeInsert, EmployeeUpdate, Site } from '@/types'
 import { DataTable } from '@/components/ui/data-table'
 import { Button } from '@/components/ui/button'
@@ -31,7 +22,11 @@ function initials(first: string, last: string) {
 }
 
 export function EmployeesPage() {
+  const { canManage, canAdminister } = useOrganization()
+  const { fetchSites, fetchDepartments, fetchDesignations, fetchShifts, fetchEmployees, createEmployee, updateEmployee, deleteEmployee } = useOrganization().services
+
   const queryClient = useQueryClient()
+  const confirm = useConfirm()
   const [searchParams] = useSearchParams()
   const { data: employees = [], isLoading } = useQuery({
     queryKey: ['employees'],
@@ -58,7 +53,10 @@ export function EmployeesPage() {
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null)
 
   // Filters
-  const [search, setSearch] = useState(searchParams.get('q') ?? '')
+  const querySearch = searchParams.get('q') ?? ''
+  const [searchInput, setSearchInput] = useState({ query: querySearch, value: querySearch })
+  const search = searchInput.query === querySearch ? searchInput.value : querySearch
+  const setSearch = (value: string) => setSearchInput({ query: querySearch, value })
   const [departmentFilter, setDepartmentFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
 
@@ -128,7 +126,7 @@ export function EmployeesPage() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Remove this employee? This cannot be undone.')) return
+    if (!await confirm('Remove this employee? This cannot be undone.')) return
     try {
       await deleteEmployee(id)
       setError(null)
@@ -176,11 +174,7 @@ export function EmployeesPage() {
   }
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center py-16">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
-      </div>
-    )
+    return <PageSkeleton />
   }
 
   return (
@@ -192,7 +186,7 @@ export function EmployeesPage() {
             Manage personnel, assignments, and real-time status.
           </p>
         </div>
-        <Button onClick={handleAdd} className="shrink-0 gap-2">
+        <Button disabled={!canAdminister} onClick={handleAdd} className="shrink-0 gap-2">
           <Plus className="h-4 w-4" />
           Add Employee
         </Button>
@@ -288,13 +282,13 @@ export function EmployeesPage() {
                     <Button size="icon" variant="ghost" title="Site assignments" onClick={() => setSelectedEmployee(row)}>
                       <MapPin className="h-4 w-4" />
                     </Button>
-                    <Button size="icon" variant="ghost" title={row.is_active ? 'Deactivate' : 'Activate'} onClick={() => handleToggleActive(row)}>
+                    <Button size="icon" variant="ghost" disabled={!canManage} title={row.is_active ? 'Deactivate' : 'Activate'} onClick={() => handleToggleActive(row)}>
                       {row.is_active ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
                     </Button>
-                    <Button size="icon" variant="ghost" title="Edit" onClick={() => handleEdit(row)}>
+                    <Button size="icon" variant="ghost" disabled={!canManage} title="Edit" onClick={() => handleEdit(row)}>
                       <Edit className="h-4 w-4" />
                     </Button>
-                    <Button size="icon" variant="ghost" title="Delete" className="hover:text-destructive" onClick={() => handleDelete(row.id)}>
+                    <Button size="icon" variant="ghost" disabled={!canManage} title="Delete" className="hover:text-destructive" onClick={() => handleDelete(row.id)}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
@@ -424,7 +418,7 @@ export function EmployeesPage() {
             </Button>
             <Button
               onClick={() => mutation.mutate()}
-              disabled={mutation.isPending || !firstName || !lastName || !email}
+              disabled={!canManage || mutation.isPending || !firstName || !lastName || !email}
             >
               {mutation.isPending ? 'Saving...' : 'Save Changes'}
             </Button>
@@ -455,6 +449,9 @@ function EmployeeAssignmentsDialog({
   onOpenChange: (open: boolean) => void
   sites: Site[]
 }) {
+  const { fetchEmployeeSites, assignEmployeeToSite, unassignEmployeeFromSite } = useOrganization().services
+  const { canManage } = useOrganization()
+
   const queryClient = useQueryClient()
   const [assignmentError, setAssignmentError] = useState<string | null>(null)
   const { data: employeeSites = [] } = useQuery({
@@ -520,13 +517,13 @@ function EmployeeAssignmentsDialog({
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => handleUnassign(site.id)}
+                      disabled={!canManage} onClick={() => handleUnassign(site.id)}
                     >
                       Unassign
                     </Button>
                   </div>
                 ) : (
-                  <Button size="sm" variant="outline" className="ml-3 shrink-0" onClick={() => handleAssign(site.id)}>
+                  <Button disabled={!canManage} size="sm" variant="outline" className="ml-3 shrink-0" onClick={() => handleAssign(site.id)}>
                     Assign
                   </Button>
                 )}

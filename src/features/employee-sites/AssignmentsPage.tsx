@@ -1,7 +1,10 @@
+import { useOrganization } from '@/hooks/useOrganization'
+import { PageSkeleton } from '@/components/PageState'
+import { useConfirm } from '@/hooks/useConfirm'
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
-import { fetchEmployeeSites, fetchEmployees, fetchSites, assignEmployeeToSite, unassignEmployeeFromSite } from '@/api/services'
+
 import { Employee, Site, EmployeeSite } from '@/types'
 import { DataTable } from '@/components/ui/data-table'
 import { Button } from '@/components/ui/button'
@@ -24,7 +27,11 @@ function initials(name: string) {
 }
 
 export function AssignmentsPage() {
+  const { canManage } = useOrganization()
+  const { fetchSites, fetchEmployees, fetchEmployeeSites, unassignEmployeeFromSite } = useOrganization().services
+
   const queryClient = useQueryClient()
+  const confirm = useConfirm()
   const [feedback, setFeedback] = useState<Feedback | null>(null)
   const { data: assignments = [], isLoading } = useQuery({
     queryKey: ['employee-sites'],
@@ -34,18 +41,14 @@ export function AssignmentsPage() {
   const { data: sites = [] } = useQuery({ queryKey: ['sites'], queryFn: fetchSites })
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center py-16">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
-      </div>
-    )
+    return <PageSkeleton />
   }
 
   const employeeMap = new Map(employees.map((e) => [e.id, `${e.first_name} ${e.last_name}`]))
   const siteMap = new Map(sites.map((s) => [s.id, s.name]))
 
   const handleUnassign = async (employeeId: string, siteId: string) => {
-    if (!confirm('Unassign employee from this site?')) return
+    if (!await confirm('Unassign employee from this site?')) return
     try {
       await unassignEmployeeFromSite(employeeId, siteId)
       setFeedback({ type: 'success', text: 'Assignment deleted successfully.' })
@@ -129,7 +132,7 @@ export function AssignmentsPage() {
                   variant="ghost"
                   title="Unassign"
                   className="hover:text-destructive"
-                  onClick={() => handleUnassign(a.employee_id, a.site_id)}
+                  disabled={!canManage} onClick={() => handleUnassign(a.employee_id, a.site_id)}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -166,6 +169,9 @@ function AssignmentForm({
   sites: Site[]
   assignments: EmployeeSite[]
 }) {
+  const { assignEmployeeToSite } = useOrganization().services
+  const { canManage } = useOrganization()
+
   const queryClient = useQueryClient()
   const [employeeId, setEmployeeId] = useState('')
   const [siteId, setSiteId] = useState('')
@@ -233,7 +239,7 @@ function AssignmentForm({
       </div>
       <Button
         onClick={() => mutation.mutate()}
-        disabled={!employeeId || !siteId || mutation.isPending}
+        disabled={!canManage || !employeeId || !siteId || mutation.isPending}
         className="gap-2 sm:mb-[2px]"
       >
         <Plus className="h-4 w-4" />

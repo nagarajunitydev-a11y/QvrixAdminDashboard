@@ -1,6 +1,8 @@
+import { useOrganization } from '@/hooks/useOrganization'
+import { PageSkeleton } from '@/components/PageState'
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { fetchLocationLogs, fetchSites, fetchEmployees, type EmployeeWithRelations } from '@/api/services'
+import type { EmployeeWithRelations } from '@/api/services'
 import { LocationLog } from '@/types'
 import { DataTable } from '@/components/ui/data-table'
 import { Card, CardContent } from '@/components/ui/card'
@@ -20,6 +22,8 @@ function initials(name: string) {
 }
 
 export function LocationLogsPage() {
+  const { fetchSites, fetchLocationLogs, fetchEmployees } = useOrganization().services
+
   const [siteFilter, setSiteFilter] = useState<string | null>(null)
   const [employeeFilter, setEmployeeFilter] = useState<string | null>(null)
 
@@ -46,11 +50,7 @@ export function LocationLogsPage() {
   }, [logs])
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center py-16">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
-      </div>
-    )
+    return <PageSkeleton />
   }
 
   const employeeMap = new Map(employees.map((e) => [e.user_id, `${e.first_name} ${e.last_name}`]))
@@ -104,13 +104,13 @@ export function LocationLogsPage() {
       <div className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap gap-3">
           <div className="min-w-[180px] flex-1 sm:max-w-64">
-            <Select value={siteFilter ?? ''} onValueChange={setSiteFilter}>
+            <Select value={siteFilter ?? 'all'} onValueChange={value => setSiteFilter(value === 'all' ? null : value)}>
               <SelectTrigger>
                 <MapPin className="mr-2 h-4 w-4 shrink-0" />
                 <SelectValue placeholder="Filter by site" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All sites</SelectItem>
+                <SelectItem value="all">All sites</SelectItem>
                 {sites.map((s) => (
                   <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                 ))}
@@ -118,13 +118,13 @@ export function LocationLogsPage() {
             </Select>
           </div>
           <div className="min-w-[180px] flex-1 sm:max-w-64">
-            <Select value={employeeFilter ?? ''} onValueChange={setEmployeeFilter}>
+            <Select value={employeeFilter ?? 'all'} onValueChange={value => setEmployeeFilter(value === 'all' ? null : value)}>
               <SelectTrigger>
                 <Users className="mr-2 h-4 w-4 shrink-0" />
                 <SelectValue placeholder="Filter by employee" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All employees</SelectItem>
+                <SelectItem value="all">All employees</SelectItem>
                 {employees.filter((e): e is EmployeeWithRelations & { user_id: string } => e.user_id !== null).map((e) => (
                   <SelectItem key={e.user_id} value={e.user_id}>
                     {e.first_name} {e.last_name}
@@ -195,6 +195,7 @@ export function LocationLogsPage() {
               },
               {
                 header: 'Time',
+                sortValue: row => row.timestamp,
                 accessor: (row: LocationLog) => formatDistanceToNow(new Date(row.timestamp), { addSuffix: true }),
               },
               {

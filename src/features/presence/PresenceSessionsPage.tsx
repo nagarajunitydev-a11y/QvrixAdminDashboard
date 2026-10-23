@@ -1,6 +1,9 @@
+import { dayBoundary, dayEnd } from '@/lib/organizationTime'
+import { useOrganization } from '@/hooks/useOrganization'
+import { PageSkeleton } from '@/components/PageState'
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { fetchPresenceSessions, fetchSites, fetchEmployees, type EmployeeWithRelations } from '@/api/services'
+import type { EmployeeWithRelations } from '@/api/services'
 import { PresenceSession } from '@/types'
 import { DataTable } from '@/components/ui/data-table'
 import { Card, CardContent } from '@/components/ui/card'
@@ -21,19 +24,22 @@ function initials(name: string) {
     .toUpperCase()
 }
 
-export function PresenceSessionsPage() {
+export function PresenceSessionsPage({ entryExit = false }: { entryExit?: boolean }) {
+  const { fetchSites, fetchPresenceSessions, fetchEmployees } = useOrganization().services
+
+  const timezone = useOrganization().activeOrganization?.timezone || 'UTC'
   const [siteFilter, setSiteFilter] = useState<string | null>(null)
   const [employeeFilter, setEmployeeFilter] = useState<string | null>(null)
   const [startDate, setStartDate] = useState<string>('')
   const [endDate, setEndDate] = useState<string>('')
 
   const { data: sessions = [], isLoading } = useQuery({
-    queryKey: ['presence-sessions', { siteId: siteFilter, userId: employeeFilter, startDate, endDate }],
+    queryKey: ['presence-sessions', { siteId: siteFilter, userId: employeeFilter, startDate, endDate, timezone }],
     queryFn: () => fetchPresenceSessions({
       siteId: siteFilter ?? undefined,
       userId: employeeFilter ?? undefined,
-      startDate: startDate || undefined,
-      endDate: endDate || undefined,
+      startDate: startDate ? dayBoundary(startDate, timezone) : undefined,
+      endDate: endDate ? dayEnd(endDate, timezone) : undefined,
     }),
   })
   const { data: sites = [] } = useQuery({ queryKey: ['sites'], queryFn: fetchSites })
@@ -48,11 +54,7 @@ export function PresenceSessionsPage() {
   }, [sessions])
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center py-16">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
-      </div>
-    )
+    return <PageSkeleton />
   }
 
   const siteMap = new Map(sites.map((s) => [s.id, s.name]))
@@ -61,7 +63,7 @@ export function PresenceSessionsPage() {
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <div>
-        <h1 className="font-headline text-headline-lg text-foreground">Attendance & Presence</h1>
+        <h1 className="font-headline text-headline-lg text-foreground">{entryExit ? 'Entry / Exit History' : 'Attendance & Presence'}</h1>
         <p className="mt-1 text-body-sm text-muted-foreground">
           Check-in/out records for all employees.
         </p>
@@ -110,13 +112,13 @@ export function PresenceSessionsPage() {
       <div className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4 shadow-sm">
         <div className="flex flex-wrap gap-3">
           <div className="min-w-[180px] flex-1 sm:max-w-64">
-            <Select value={siteFilter ?? ''} onValueChange={setSiteFilter}>
+            <Select value={siteFilter ?? 'all'} onValueChange={value => setSiteFilter(value === 'all' ? null : value)}>
               <SelectTrigger>
                 <MapPin className="mr-2 h-4 w-4 shrink-0" />
                 <SelectValue placeholder="Filter by site" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All sites</SelectItem>
+                <SelectItem value="all">All sites</SelectItem>
                 {sites.map((s) => (
                   <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                 ))}
@@ -124,13 +126,13 @@ export function PresenceSessionsPage() {
             </Select>
           </div>
           <div className="min-w-[180px] flex-1 sm:max-w-64">
-            <Select value={employeeFilter ?? ''} onValueChange={setEmployeeFilter}>
+            <Select value={employeeFilter ?? 'all'} onValueChange={value => setEmployeeFilter(value === 'all' ? null : value)}>
               <SelectTrigger>
                 <Users className="mr-2 h-4 w-4 shrink-0" />
                 <SelectValue placeholder="Filter by employee" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All employees</SelectItem>
+                <SelectItem value="all">All employees</SelectItem>
                 {employees.filter((e): e is EmployeeWithRelations & { user_id: string } => e.user_id !== null).map((e) => (
                   <SelectItem key={e.user_id} value={e.user_id}>
                     {e.first_name} {e.last_name}
@@ -187,17 +189,20 @@ export function PresenceSessionsPage() {
               },
               {
                 header: 'Check-in',
+                sortValue: row => row.entry_timestamp,
                 accessor: (row: PresenceSession) =>
                   formatDistanceToNow(new Date(row.entry_timestamp), { addSuffix: true }),
               },
               {
                 header: 'Check-out',
+                sortValue: row => row.exit_timestamp ?? 0,
                 accessor: (row: PresenceSession) => row.exit_timestamp
                   ? formatDistanceToNow(new Date(row.exit_timestamp), { addSuffix: true })
                   : '—',
               },
               {
                 header: 'Duration',
+                sortValue: row => row.total_hours ?? 0,
                 accessor: (row: PresenceSession) => (
                   <span className="font-label text-label-md">
                     {row.total_hours ? `${row.total_hours.toFixed(2)} hrs` : 'Active'}

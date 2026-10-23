@@ -1,11 +1,9 @@
+import { useOrganization } from '@/hooks/useOrganization'
+import { PageSkeleton } from '@/components/PageState'
+import { useConfirm } from '@/hooks/useConfirm'
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import {
-  fetchDepartments,
-  createDepartment,
-  updateDepartment,
-  deleteDepartment,
-} from '@/api/services'
+
 import { Department, DepartmentInsert, DepartmentUpdate } from '@/types'
 import { DataTable } from '@/components/ui/data-table'
 import { Button } from '@/components/ui/button'
@@ -18,7 +16,11 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Plus, Edit, Trash2 } from 'lucide-react'
 
 export function DepartmentsPage() {
+  const { canManage } = useOrganization()
+  const { fetchDepartments, createDepartment, updateDepartment, deleteDepartment } = useOrganization().services
+
   const queryClient = useQueryClient()
+  const confirm = useConfirm()
   const [editing, setEditing] = useState<Department | null>(null)
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [name, setName] = useState('')
@@ -56,7 +58,7 @@ export function DepartmentsPage() {
   })
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this department? This cannot be undone.')) return
+    if (!await confirm('Delete this department? This cannot be undone.')) return
     try {
       await deleteDepartment(id)
       setError(null)
@@ -88,11 +90,7 @@ export function DepartmentsPage() {
   }
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center py-16">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
-      </div>
-    )
+    return <PageSkeleton />
   }
 
   return (
@@ -102,7 +100,7 @@ export function DepartmentsPage() {
           <h1 className="font-headline text-headline-lg text-foreground">Departments</h1>
           <p className="mt-1 text-body-sm text-muted-foreground">Manage organizational departments.</p>
         </div>
-        <Button onClick={handleAdd} className="shrink-0 gap-2">
+        <Button disabled={!canManage} onClick={handleAdd} className="shrink-0 gap-2">
           <Plus className="h-4 w-4" />
           Add Department
         </Button>
@@ -130,10 +128,10 @@ export function DepartmentsPage() {
               ...d,
               actions: (
                 <div className="flex justify-end gap-1">
-                  <Button size="icon" variant="ghost" title="Edit" onClick={() => handleEdit(d)}>
+                  <Button size="icon" variant="ghost" disabled={!canManage} title="Edit" onClick={() => handleEdit(d)}>
                     <Edit className="h-4 w-4" />
                   </Button>
-                  <Button size="icon" variant="ghost" title="Delete" className="hover:text-destructive" onClick={() => handleDelete(d.id)}>
+                  <Button size="icon" variant="ghost" disabled={!canManage} title="Delete" className="hover:text-destructive" onClick={() => handleDelete(d.id)}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
@@ -178,7 +176,7 @@ export function DepartmentsPage() {
             </Button>
             <Button
               type="submit"
-              disabled={mutation.isPending || !name}
+              disabled={!canManage || mutation.isPending || !name}
               onClick={() => mutation.mutate()}
             >
               {mutation.isPending ? 'Saving...' : 'Save'}
