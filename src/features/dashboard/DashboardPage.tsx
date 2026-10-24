@@ -8,6 +8,9 @@ import {
   fetchLocationLogs,
 } from '@/api/services'
 import { Badge } from '@/components/ui/badge'
+import { PageHeader } from '@/components/ui/page-header'
+import { PageSkeleton } from '@/components/ui/states'
+import { StatCard } from '@/components/ui/stat-card'
 import { Button } from '@/components/ui/button'
 import {
   Users,
@@ -15,13 +18,14 @@ import {
   Building2,
   CalendarDays,
   Download,
-  ArrowUpRight,
   ArrowDownRight,
   Radar,
   ShieldAlert,
   ClipboardList,
+  Clock3,
 } from 'lucide-react'
 import type { EmployeeWithRelations } from '@/api/services'
+import { deriveWorkforceCounts } from '@/lib/workforce'
 
 function initials(first?: string | null, last?: string | null) {
   return `${first?.[0] ?? 'E'}${last?.[0] ?? ''}`.toUpperCase()
@@ -81,18 +85,10 @@ export function DashboardPage() {
     queryFn: () => fetchLocationLogs({ limit: 12 }),
   })
 
-  const stats = useMemo(() => {
-    const totalEmployees = employees.length
-    const activeUserIds = new Set(
-      activeSessions.map((s) => s.user_id).filter((id): id is string => id !== null)
-    )
-    const insideCount = activeUserIds.size
-    const trackable = employees.filter((e) => e.user_id !== null)
-    const outsideCount = trackable.filter((e) => e.user_id !== null && !activeUserIds.has(e.user_id)).length
-    const offlineCount = totalEmployees - trackable.length
-    const percentInside = totalEmployees > 0 ? Math.round((insideCount / totalEmployees) * 100) : 0
-    return { totalEmployees, insideCount, outsideCount, offlineCount, percentInside }
-  }, [employees, activeSessions])
+  const stats = useMemo(
+    () => deriveWorkforceCounts(employees, activeSessions),
+    [employees, activeSessions]
+  )
 
   const alerts = useMemo(
     () => recentLogs.filter((log) => !log.is_inside).slice(0, 4),
@@ -128,98 +124,78 @@ export function DashboardPage() {
   }, [sites, activeSessions])
 
   if (sitesLoading && employeesLoading) {
-    return (
-      <div className="flex justify-center py-16">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
-      </div>
-    )
+    return <PageSkeleton cards={4} rows={5} />
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
-      {/* Page header */}
-      <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-        <div>
-          <h1 className="font-headline text-headline-lg text-foreground">Global Operations</h1>
-          <p className="text-body-sm text-muted-foreground">
-            Real-time workforce overview for today.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" className="gap-2">
-            <CalendarDays className="h-4 w-4" />
-            {new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-          </Button>
-          <Button className="gap-2" onClick={() => exportEmployeesCsv(employees)}>
-            <Download className="h-4 w-4" />
-            Export Report
-          </Button>
-        </div>
-      </div>
+    <div className="page-shell">
+      <PageHeader
+        eyebrow="Operations overview"
+        title="Command Center"
+        description="Live workforce posture, geofence health, and activity across every site."
+        icon={() => <img src="/crewtraxa-pin.png" alt="Crewtraxa" className="h-5 w-5 object-contain" />}
+        actions={
+          <>
+            <Button variant="outline" className="gap-2">
+              <CalendarDays className="h-4 w-4" />
+              {new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+            </Button>
+            <Button className="gap-2" onClick={() => exportEmployeesCsv(employees)}>
+              <Download className="h-4 w-4" />
+              Export Report
+            </Button>
+          </>
+        }
+      />
 
-      {/* KPI Bento Grid */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <div className="card-kpi group">
-          <div className="mb-2 flex items-start justify-between">
-            <span className="font-label text-label-md text-muted-foreground">Total Employees</span>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </div>
-          <span className="font-headline text-headline-lg text-foreground">{stats.totalEmployees}</span>
-          <div className="mt-2 flex items-center gap-1">
-            <ArrowUpRight className="h-3.5 w-3.5 text-emerald-600" />
-            <span className="font-label text-label-sm text-emerald-600">
-              {stats.percentInside}% on shift
-            </span>
-          </div>
-          <div className="sparkline sparkline-blue" />
-        </div>
-
-        <div className="card-kpi group">
-          <div className="mb-2 flex items-start justify-between">
-            <span className="font-label text-label-md text-muted-foreground">On Duty</span>
-            <Badge variant="success" dot>Live</Badge>
-          </div>
-          <span className="font-headline text-headline-lg text-foreground">{stats.insideCount}</span>
-          <div className="relative z-10 mt-3 h-1.5 w-full rounded-full bg-muted">
-            <div
-              className="h-1.5 rounded-full bg-emerald-500 transition-all"
-              style={{ width: `${stats.percentInside}%` }}
-            />
-          </div>
-          <span className="relative z-10 mt-1 block text-[11px] text-muted-foreground">
-            {stats.percentInside}% of workforce inside sites
-          </span>
-          <div className="sparkline sparkline-green" />
-        </div>
-
-        <div className="card p-4 md:col-span-2">
-          <div className="mb-2 flex items-start justify-between">
-            <span className="font-label text-label-md text-muted-foreground">Current Location Status</span>
-            <Building2 className="h-4 w-4 text-muted-foreground" />
-          </div>
-          <div className="mt-1 flex flex-wrap gap-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Total Employees"
+          value={stats.totalEmployees}
+          hint={`${stats.percentInside}% currently inside a site`}
+          icon={Users}
+          tone="teal"
+        />
+        <StatCard
+          label="On Duty"
+          value={stats.insideCount}
+          icon={MapPin}
+          tone="emerald"
+          footer={
             <div>
-              <span className="mb-1 block font-label text-label-sm text-muted-foreground">Inside Site</span>
-              <span className="flex items-baseline gap-2 font-headline text-headline-md text-foreground">
-                {stats.insideCount} <Badge variant="success" dot>On-Site</Badge>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-1.5 rounded-full bg-emerald-500 transition-all"
+                  style={{ width: `${stats.percentInside}%` }}
+                />
+              </div>
+              <span className="mt-1.5 block text-[11px]">
+                {stats.percentInside}% of workforce inside sites
               </span>
             </div>
-            <div className="w-px self-stretch bg-border" />
-            <div>
-              <span className="mb-1 block font-label text-label-sm text-muted-foreground">Outside Site</span>
-              <span className="flex items-baseline gap-2 font-headline text-headline-md text-foreground">
-                {stats.outsideCount} <Badge variant="warning" dot>Transit</Badge>
-              </span>
-            </div>
-            <div className="w-px self-stretch bg-border" />
-            <div>
-              <span className="mb-1 block font-label text-label-sm text-muted-foreground">No Device Linked</span>
-              <span className="flex items-baseline gap-2 font-headline text-headline-md text-foreground">
-                {stats.offlineCount} <Badge variant="destructive" dot>Offline</Badge>
-              </span>
-            </div>
-          </div>
-        </div>
+          }
+        />
+        <StatCard
+          label="Outside Site"
+          value={stats.outsideCount}
+          hint="Tracked employees outside geofence (recent location)"
+          icon={Building2}
+          tone="amber"
+        />
+        <StatCard
+          label="Checked Out"
+          value={stats.checkedOutUserIds.size}
+          hint="Employees who ended their shift"
+          icon={Clock3}
+          tone="slate"
+        />
+        <StatCard
+          label="No Device Linked"
+          value={stats.offlineCount}
+          hint="Accounts without a tracking device"
+          icon={ShieldAlert}
+          tone="red"
+        />
       </div>
 
       {/* Distribution + Alerts */}
@@ -266,7 +242,7 @@ export function DashboardPage() {
                         />
                       </div>
                       <p className="mt-2 truncate font-label text-label-sm text-muted-foreground">
-                        {site.latitude.toFixed(4)}, {site.longitude.toFixed(4)} · r={site.radius_in_meters}m
+                        {site.latitude.toFixed(4)}, {site.longitude.toFixed(4)} Â· r={site.radius_in_meters}m
                       </p>
                     </Link>
                   )
@@ -282,8 +258,8 @@ export function DashboardPage() {
                 <span className="text-[11px] text-muted-foreground">High (80%+)</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-full bg-blue-500" />
-                <span className="text-[11px] text-muted-foreground">Medium (40–79%)</span>
+                <span className="h-2.5 w-2.5 rounded-full bg-sky-500" />
+                <span className="text-[11px] text-muted-foreground">Medium (40â€“79%)</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
@@ -323,7 +299,7 @@ export function DashboardPage() {
                     </span>
                   </div>
                   <p className="mb-2 text-xs text-muted-foreground">
-                    Outside {log.site_id ? siteNameById.get(log.site_id) ?? 'assigned site' : 'any site'} ·{' '}
+                    Outside {log.site_id ? siteNameById.get(log.site_id) ?? 'assigned site' : 'any site'} Â·{' '}
                     {log.distance_to_site != null ? `${Math.round(log.distance_to_site)}m away` : 'distance unknown'}
                   </p>
                   <Link
@@ -383,7 +359,7 @@ export function DashboardPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
-                      {log.site_id ? siteNameById.get(log.site_id) ?? '—' : 'No site'}
+                      {log.site_id ? siteNameById.get(log.site_id) ?? 'â€”' : 'No site'}
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">
                       {timeAgo(log.timestamp)}
@@ -429,7 +405,7 @@ export function DashboardPage() {
                   <div className="mb-1 flex items-end justify-between">
                     <span className="font-label text-label-sm text-foreground">{site.name}</span>
                     <span className="font-label text-label-sm text-muted-foreground">
-                      {inside} checked in · {sites.length > 0 ? `${pct}% of peak` : ''}
+                      {inside} checked in Â· {sites.length > 0 ? `${pct}% of peak` : ''}
                     </span>
                   </div>
                   <div className="h-2 w-full overflow-hidden rounded-full bg-muted">

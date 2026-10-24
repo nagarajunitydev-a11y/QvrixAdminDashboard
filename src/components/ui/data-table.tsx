@@ -1,4 +1,6 @@
 import * as React from "react"
+import { ChevronLeft, ChevronRight } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 export type ColumnDef<T> = {
   header: string
@@ -10,12 +12,22 @@ export interface DataTableProps<TData> {
   columns: ColumnDef<TData>[]
   data: TData[]
   pageSize?: number
+  emptyMessage?: string
+  emptyState?: React.ReactNode
+}
+
+function pageWindow(current: number, total: number) {
+  if (total <= 5) return Array.from({ length: total }, (_, i) => i)
+  const start = Math.max(0, Math.min(current - 2, total - 5))
+  return Array.from({ length: 5 }, (_, i) => start + i)
 }
 
 export function DataTable<TData extends object>({
   columns,
   data,
   pageSize = 10,
+  emptyMessage = "No records found",
+  emptyState,
 }: DataTableProps<TData>) {
   const [rawPageIndex, setPageIndex] = React.useState(0)
   const pageCount = Math.max(1, Math.ceil(data.length / pageSize))
@@ -25,29 +37,33 @@ export function DataTable<TData extends object>({
   const end = Math.min(start + pageSize, data.length)
   const pageData = data.slice(start, end)
 
+  if (emptyState && data.length === 0) return <>{emptyState}</>
+
   return (
     <div className="flex flex-col">
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-left">
+      <div className="scrollbar-thin overflow-x-auto">
+        <table className="w-full min-w-[640px] border-collapse text-left">
           <thead>
-            <tr className="border-b border-border bg-muted">
+            <tr className="border-b border-border bg-muted/60">
               {columns.map((column, i) => (
                 <th
                   key={i}
-                  className={`whitespace-nowrap px-4 py-3 font-label text-label-sm font-semibold uppercase tracking-wider text-muted-foreground ${
-                    column.className ?? ""
-                  }`}
+                  scope="col"
+                  className={cn(
+                    "whitespace-nowrap px-4 py-3 font-label text-label-sm font-semibold uppercase tracking-[0.08em] text-muted-foreground",
+                    column.className
+                  )}
                 >
                   {column.header}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="font-body text-body-sm divide-y divide-border">
+          <tbody className="divide-y divide-border/80 font-body text-body-sm">
             {pageData.map((row, i) => (
-              <tr key={start + i} className="row-hover transition-colors">
+              <tr key={start + i} className="row-hover">
                 {columns.map((column, j) => (
-                  <td key={j} className={`px-4 py-3 align-middle ${column.className ?? ""}`}>
+                  <td key={j} className={cn("px-4 py-3 align-middle", column.className)}>
                     {typeof column.accessor === 'function'
                       ? column.accessor(row)
                       : String(row[column.accessor as keyof TData] ?? '')}
@@ -57,8 +73,11 @@ export function DataTable<TData extends object>({
             ))}
             {pageData.length === 0 && (
               <tr>
-                <td colSpan={columns.length} className="px-4 py-10 text-center text-body-sm text-muted-foreground">
-                  No records found
+                <td
+                  colSpan={columns.length}
+                  className="px-4 py-12 text-center text-body-sm text-muted-foreground"
+                >
+                  {emptyMessage}
                 </td>
               </tr>
             )}
@@ -67,36 +86,41 @@ export function DataTable<TData extends object>({
       </div>
       <div className="flex flex-col gap-3 border-t border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <span className="text-body-sm text-muted-foreground">
-          Showing {data.length === 0 ? 0 : start + 1} to {end} of {data.length} entries
+          Showing {data.length === 0 ? 0 : start + 1}&ndash;{end} of {data.length}
         </span>
         <div className="flex items-center gap-1">
           <button
             onClick={() => setPageIndex(Math.max(0, pageIndex - 1))}
             disabled={pageIndex === 0}
-            className="rounded-md border border-input bg-card px-3 py-1.5 text-label-md text-muted-foreground transition-colors hover:bg-muted disabled:opacity-50"
+            className="flex h-8 items-center gap-1 rounded-md border border-input bg-card px-2.5 text-label-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+            aria-label="Previous page"
           >
-            Previous
+            <ChevronLeft className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Previous</span>
           </button>
-          {Array.from({ length: pageCount }).slice(0, 5).map((_, p) => (
+          {pageWindow(pageIndex, pageCount).map((p) => (
             <button
               key={p}
               onClick={() => setPageIndex(p)}
-              className={`h-8 min-w-8 rounded-md px-2 py-1.5 text-label-md transition-colors ${
+              aria-current={pageIndex === p ? 'page' : undefined}
+              className={cn(
+                "h-8 min-w-8 rounded-md px-2 text-label-md transition-colors",
                 pageIndex === p
                   ? "bg-primary text-primary-foreground shadow-sm"
                   : "border border-input bg-card text-foreground hover:bg-muted"
-              }`}
+              )}
             >
               {p + 1}
             </button>
           ))}
-          {pageCount > 5 && <span className="px-1 text-muted-foreground">…</span>}
           <button
             onClick={() => setPageIndex(Math.min(pageCount - 1, pageIndex + 1))}
             disabled={pageIndex >= pageCount - 1}
-            className="rounded-md border border-input bg-card px-3 py-1.5 text-label-md text-muted-foreground transition-colors hover:bg-muted disabled:opacity-50"
+            className="flex h-8 items-center gap-1 rounded-md border border-input bg-card px-2.5 text-label-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+            aria-label="Next page"
           >
-            Next
+            <span className="hidden sm:inline">Next</span>
+            <ChevronRight className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>

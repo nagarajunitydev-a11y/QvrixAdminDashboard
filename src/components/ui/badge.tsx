@@ -12,7 +12,7 @@ const badgeVariants = cva(
         destructive: "bg-red-500/10 text-red-700 ring-red-500/20 dark:text-red-400",
         success: "bg-emerald-500/10 text-emerald-700 ring-emerald-500/20 dark:text-emerald-400",
         warning: "bg-amber-500/10 text-amber-700 ring-amber-500/20 dark:text-amber-400",
-        info: "bg-blue-500/10 text-blue-700 ring-blue-500/20 dark:text-blue-400",
+        info: "bg-sky-500/10 text-sky-700 ring-sky-500/20 dark:text-sky-400",
         outline: "text-foreground ring-border",
       },
     },
@@ -42,7 +42,7 @@ function Badge({ className, variant, dot = false, children, ...props }: BadgePro
             variant === "success" && "bg-emerald-500",
             variant === "warning" && "bg-amber-500",
             variant === "destructive" && "bg-red-500",
-            variant === "info" && "bg-blue-500",
+            variant === "info" && "bg-sky-500",
             variant === "default" && "bg-primary",
             variant === "secondary" && "bg-slate-400",
             variant === "outline" && "bg-slate-400"

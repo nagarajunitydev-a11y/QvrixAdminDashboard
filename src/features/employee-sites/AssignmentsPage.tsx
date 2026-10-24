@@ -9,7 +9,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Trash2, Users, MapPin } from 'lucide-react'
+import { PageHeader } from '@/components/ui/page-header'
+import { PageSkeleton } from '@/components/ui/states'
+import { Plus, Trash2, Users, MapPin, MapPinned } from 'lucide-react'
 
 type Feedback = { type: 'success' | 'error'; text: string }
 
@@ -34,11 +36,7 @@ export function AssignmentsPage() {
   const { data: sites = [] } = useQuery({ queryKey: ['sites'], queryFn: fetchSites })
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center py-16">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
-      </div>
-    )
+    return <PageSkeleton cards={0} rows={6} />
   }
 
   const employeeMap = new Map(employees.map((e) => [e.id, `${e.first_name} ${e.last_name}`]))
@@ -59,13 +57,13 @@ export function AssignmentsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
-      <div>
-        <h1 className="font-headline text-headline-lg text-foreground">Employee Assignments</h1>
-        <p className="mt-1 text-body-sm text-muted-foreground">
-          Manage which employees are assigned to which sites.
-        </p>
-      </div>
+    <div className="page-shell">
+      <PageHeader
+        eyebrow="Site coverage"
+        title="Employee Assignments"
+        description="Manage which employees are assigned to which sites."
+        icon={MapPinned}
+      />
 
       {feedback && (
         <Alert variant={feedback.type === 'error' ? 'destructive' : 'default'}>

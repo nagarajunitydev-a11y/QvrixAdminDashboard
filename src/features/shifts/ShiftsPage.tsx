@@ -16,7 +16,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Plus, Edit, Trash2 } from 'lucide-react'
+import { PageHeader } from '@/components/ui/page-header'
+import { PageSkeleton } from '@/components/ui/states'
+import { Clock3, Plus, Edit, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
 
 export function ShiftsPage() {
@@ -103,25 +105,23 @@ export function ShiftsPage() {
   }
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center py-16">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
-      </div>
-    )
+    return <PageSkeleton cards={0} rows={5} />
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="font-headline text-headline-lg text-foreground">Shifts</h1>
-          <p className="mt-1 text-body-sm text-muted-foreground">Manage work shift definitions.</p>
-        </div>
-        <Button onClick={handleAdd} className="shrink-0 gap-2">
-          <Plus className="h-4 w-4" />
-          Add Shift
-        </Button>
-      </div>
+    <div className="page-shell">
+      <PageHeader
+        eyebrow="Scheduling"
+        title="Shifts"
+        description="Configure working hours and assign them to departments."
+        icon={Clock3}
+        actions={
+          <Button onClick={handleAdd} className="shrink-0 gap-2">
+            <Plus className="h-4 w-4" />
+            Add Shift
+          </Button>
+        }
+      />
 
       {error && !isFormOpen && (
         <Alert variant="destructive">

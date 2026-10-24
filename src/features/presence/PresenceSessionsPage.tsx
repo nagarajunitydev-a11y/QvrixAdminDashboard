@@ -9,7 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { formatDistanceToNow } from 'date-fns'
-import { MapPin, Users, Radar, Clock3, CalendarRange } from 'lucide-react'
+import { PageHeader } from '@/components/ui/page-header'
+import { PageSkeleton } from '@/components/ui/states'
+import { MapPin, Users, Radar, Clock3, CalendarRange, CalendarCheck2 } from 'lucide-react'
 
 function initials(name: string) {
   return name
@@ -48,24 +50,20 @@ export function PresenceSessionsPage() {
   }, [sessions])
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center py-16">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
-      </div>
-    )
+    return <PageSkeleton cards={3} rows={6} />
   }
 
   const siteMap = new Map(sites.map((s) => [s.id, s.name]))
   const employeeMap = new Map(employees.map((e) => [e.user_id, `${e.first_name} ${e.last_name}`]))
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
-      <div>
-        <h1 className="font-headline text-headline-lg text-foreground">Attendance & Presence</h1>
-        <p className="mt-1 text-body-sm text-muted-foreground">
-          Check-in/out records for all employees.
-        </p>
-      </div>
+    <div className="page-shell">
+      <PageHeader
+        eyebrow="Time & attendance"
+        title="Attendance & Presence"
+        description="Check-in and check-out sessions recorded across all sites."
+        icon={CalendarCheck2}
+      />
 
       {/* Summary cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -207,8 +205,8 @@ export function PresenceSessionsPage() {
               {
                 header: 'Status',
                 accessor: (row: PresenceSession) => (
-                  <Badge variant={row.exit_timestamp ? 'secondary' : 'success'} dot>
-                    {row.exit_timestamp ? 'Completed' : 'Active'}
+                  <Badge variant={row.exit_timestamp ? 'warning' : 'success'} dot>
+                    {row.exit_timestamp ? 'Checked Out' : 'Active'}
                   </Badge>
                 ),
               },

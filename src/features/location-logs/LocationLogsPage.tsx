@@ -7,6 +7,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatDistanceToNow } from 'date-fns'
+import { PageHeader } from '@/components/ui/page-header'
+import { PageSkeleton } from '@/components/ui/states'
 import { MapPin, Users, Route, ShieldCheck, ShieldAlert } from 'lucide-react'
 
 function initials(name: string) {
@@ -46,24 +48,20 @@ export function LocationLogsPage() {
   }, [logs])
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center py-16">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
-      </div>
-    )
+    return <PageSkeleton cards={3} rows={6} />
   }
 
   const employeeMap = new Map(employees.map((e) => [e.user_id, `${e.first_name} ${e.last_name}`]))
   const siteMap = new Map(sites.map((s) => [s.id, s.name]))
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
-      <div>
-        <h1 className="font-headline text-headline-lg text-foreground">Location History</h1>
-        <p className="mt-1 text-body-sm text-muted-foreground">
-          GPS location points recorded by employee devices. Showing most recent 100 records.
-        </p>
-      </div>
+    <div className="page-shell">
+      <PageHeader
+        eyebrow="Historical trace"
+        title="Location History"
+        description="GPS location points recorded by employee devices. Showing the most recent 100 records."
+        icon={Route}
+      />
 
       {/* Summary */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

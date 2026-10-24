@@ -24,7 +24,9 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Plus, Edit, Trash2, UserCheck, UserX, MapPin, Search } from 'lucide-react'
+import { PageHeader } from '@/components/ui/page-header'
+import { PageSkeleton } from '@/components/ui/states'
+import { Plus, Edit, Trash2, UserCheck, UserX, MapPin, Search, Users } from 'lucide-react'
 
 function initials(first: string, last: string) {
   return `${first[0] ?? ''}${last[0] ?? ''}`.toUpperCase()
@@ -176,27 +178,23 @@ export function EmployeesPage() {
   }
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center py-16">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
-      </div>
-    )
+    return <PageSkeleton cards={0} rows={7} />
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="font-headline text-headline-lg text-foreground">Employees</h1>
-          <p className="mt-1 text-body-sm text-muted-foreground">
-            Manage personnel, assignments, and real-time status.
-          </p>
-        </div>
-        <Button onClick={handleAdd} className="shrink-0 gap-2">
-          <Plus className="h-4 w-4" />
-          Add Employee
-        </Button>
-      </div>
+    <div className="page-shell">
+      <PageHeader
+        eyebrow="Workforce directory"
+        title="Employees"
+        description="Manage personnel, site assignments, and real-time status."
+        icon={Users}
+        actions={
+          <Button onClick={handleAdd} className="shrink-0 gap-2">
+            <Plus className="h-4 w-4" />
+            Add Employee
+          </Button>
+        }
+      />
 
       {error && !isFormOpen && (
         <Alert variant="destructive">

@@ -1,0 +1,51 @@
+{
+  "project": "eqyycmmbcesrtxuawyyb.supabase.co",
+  "results": [
+    {
+      "path": "organizations?select=id&limit=0",
+      "status": 404,
+      "body": {
+        "code": "PGRST205",
+        "details": null,
+        "hint": "Perhaps you meant the table 'public.designations'",
+        "message": "Could not find the table 'public.organizations' in the schema cache"
+      }
+    },
+    {
+      "path": "organization_memberships?select=*&user_id=eq.00000000-0000-0000-0000-000000000000",
+      "status": 404,
+      "body": {
+        "code": "PGRST205",
+        "details": null,
+        "hint": null,
+        "message": "Could not find the table 'public.organization_memberships' in the schema cache"
+      }
+    },
+    {
+      "path": "rpc/is_platform_admin",
+      "status": 404,
+      "body": {
+        "code": "PGRST202",
+        "details": "Searched for the function public.is_platform_admin without parameters or with a single unnamed json/jsonb parameter, but no matches were found in the schema cache.",
+        "hint": null,
+        "message": "Could not find the function public.is_platform_admin without parameters in the schema cache"
+      }
+    },
+    {
+      "path": "rpc/validate_organization_selection",
+      "status": 404,
+      "body": {
+        "code": "PGRST202",
+        "details": "Searched for the function public.validate_organization_selection with parameter org or with a single unnamed json/jsonb parameter, but no matches were found in the schema cache.",
+        "hint": null,
+        "message": "Could not find the function public.validate_organization_selection(org) in the schema cache"
+      }
+    }
+  ],
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 404 ()",
+    "Failed to load resource: the server responded with a status of 404 ()",
+    "Failed to load resource: the server responded with a status of 404 ()",
+    "Failed to load resource: the server responded with a status of 404 ()"
+  ]
+}

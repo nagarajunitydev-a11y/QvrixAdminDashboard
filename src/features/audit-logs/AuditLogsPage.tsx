@@ -6,6 +6,8 @@ import { DataTable } from '@/components/ui/data-table'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { formatDistanceToNow } from 'date-fns'
+import { PageHeader } from '@/components/ui/page-header'
+import { PageSkeleton } from '@/components/ui/states'
 import { Filter, Search, ScrollText, Plus, Pencil, Trash2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -20,11 +22,7 @@ export function AuditLogsPage() {
   })
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center py-16">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
-      </div>
-    )
+    return <PageSkeleton cards={0} rows={8} />
   }
 
   const filteredLogs = logs.filter(
@@ -47,13 +45,13 @@ export function AuditLogsPage() {
   } as const
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
-      <div>
-        <h1 className="font-headline text-headline-lg text-foreground">Audit Logs</h1>
-        <p className="mt-1 text-body-sm text-muted-foreground">
-          Track all administrative actions across the system.
-        </p>
-      </div>
+    <div className="page-shell">
+      <PageHeader
+        eyebrow="Accountability"
+        title="Audit Logs"
+        description="Track every administrative action across the system."
+        icon={ScrollText}
+      />
 
       {/* Filters */}
       <div className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">

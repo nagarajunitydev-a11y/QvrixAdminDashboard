@@ -15,7 +15,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Plus, Edit, Trash2 } from 'lucide-react'
+import { PageHeader } from '@/components/ui/page-header'
+import { PageSkeleton } from '@/components/ui/states'
+import { Building2, Plus, Edit, Trash2 } from 'lucide-react'
 
 export function DepartmentsPage() {
   const queryClient = useQueryClient()
@@ -88,25 +90,23 @@ export function DepartmentsPage() {
   }
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center py-16">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
-      </div>
-    )
+    return <PageSkeleton cards={0} rows={5} />
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="font-headline text-headline-lg text-foreground">Departments</h1>
-          <p className="mt-1 text-body-sm text-muted-foreground">Manage organizational departments.</p>
-        </div>
-        <Button onClick={handleAdd} className="shrink-0 gap-2">
-          <Plus className="h-4 w-4" />
-          Add Department
-        </Button>
-      </div>
+    <div className="page-shell">
+      <PageHeader
+        eyebrow="Organization"
+        title="Departments"
+        description="Structure the business into teams and reporting groups."
+        icon={Building2}
+        actions={
+          <Button onClick={handleAdd} className="shrink-0 gap-2">
+            <Plus className="h-4 w-4" />
+            Add Department
+          </Button>
+        }
+      />
 
       {error && !isFormOpen && (
         <Alert variant="destructive">

@@ -3,11 +3,14 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider } from './api/AuthProvider'
 import { queryClient } from './api/queryClient'
 import { ProtectedRoute } from './auth/ProtectedRoute'
+import { ThemeProvider } from './components/ThemeProvider'
+import { ToastProvider } from './components/ui/toast'
 import { ManagerLayout } from './components/ManagerLayout'
 import { LoginPage } from './components/LoginPage'
 
 // Lazy-loaded feature pages
 import { DashboardPage } from './features/dashboard/DashboardPage'
+import { LiveTrackingPage } from './features/live-tracking/LiveTrackingPage'
 import { EmployeesPage } from './features/employees/EmployeesPage'
 import { DepartmentsPage } from './features/departments/DepartmentsPage'
 import { DesignationsPage } from './features/designations/DesignationsPage'
@@ -16,32 +19,47 @@ import { SitesPage } from './features/sites/SitesPage'
 import { LocationLogsPage } from './features/location-logs/LocationLogsPage'
 import { PresenceSessionsPage } from './features/presence/PresenceSessionsPage'
 import { AssignmentsPage } from './features/employee-sites/AssignmentsPage'
+import { AlertsPage } from './features/alerts/AlertsPage'
+import { ReportsPage } from './features/reports/ReportsPage'
+import { UsersRolesPage } from './features/users/UsersRolesPage'
+import { SettingsPage } from './features/settings/SettingsPage'
 import { AuditLogsPage } from './features/audit-logs/AuditLogsPage'
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route element={<ProtectedRoute />}>
-              <Route element={<ManagerLayout />}>
-                <Route path="/" element={<DashboardPage />} />
-                <Route path="/employees" element={<EmployeesPage />} />
-                <Route path="/departments" element={<DepartmentsPage />} />
-                <Route path="/designations" element={<DesignationsPage />} />
-                <Route path="/shifts" element={<ShiftsPage />} />
-                <Route path="/sites" element={<SitesPage />} />
-                <Route path="/location-logs" element={<LocationLogsPage />} />
-                <Route path="/presence" element={<PresenceSessionsPage />} />
-                <Route path="/assignments" element={<AssignmentsPage />} />
-                <Route path="/audit" element={<AuditLogsPage />} />
-              </Route>
-            </Route>
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </BrowserRouter>
+        <ThemeProvider>
+          <ToastProvider>
+            <BrowserRouter>
+              <Routes>
+                <Route path="/login" element={<LoginPage />} />
+                <Route element={<ProtectedRoute />}>
+                  <Route element={<ManagerLayout />}>
+                    <Route path="/" element={<DashboardPage />} />
+                    <Route path="/live-tracking" element={<LiveTrackingPage />} />
+                    <Route path="/employees" element={<EmployeesPage />} />
+                    <Route path="/departments" element={<DepartmentsPage />} />
+                    <Route path="/designations" element={<DesignationsPage />} />
+                    <Route path="/shifts" element={<ShiftsPage />} />
+                    <Route path="/sites" element={<SitesPage />} />
+                    <Route path="/attendance" element={<PresenceSessionsPage />} />
+                    <Route path="/presence" element={<PresenceSessionsPage />} />
+                    <Route path="/history" element={<LocationLogsPage />} />
+                    <Route path="/location-logs" element={<LocationLogsPage />} />
+                    <Route path="/alerts" element={<AlertsPage />} />
+                    <Route path="/reports" element={<ReportsPage />} />
+                    <Route path="/assignments" element={<AssignmentsPage />} />
+                    <Route path="/users" element={<UsersRolesPage />} />
+                    <Route path="/settings" element={<SettingsPage />} />
+                    <Route path="/audit" element={<AuditLogsPage />} />
+                  </Route>
+                </Route>
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </BrowserRouter>
+          </ToastProvider>
+        </ThemeProvider>
       </AuthProvider>
     </QueryClientProvider>
   )

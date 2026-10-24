@@ -10,14 +10,27 @@
  */
 export const PAGE_QUERY_KEYS: Record<string, string[]> = {
   '/': ['sites', 'employees', 'active-presence-sessions', 'recent-location-logs'],
+  '/live-tracking': ['employees', 'sites', 'active-presence-sessions', 'live-location-logs'],
   '/employees': ['employees', 'departments', 'designations', 'shifts', 'sites', 'employee-sites'],
   '/departments': ['departments'],
   '/designations': ['designations'],
   '/shifts': ['shifts', 'departments'],
   '/sites': ['sites', 'employees', 'employee-sites'],
   '/location-logs': ['location-logs', 'sites', 'employees'],
+  '/history': ['location-logs', 'sites', 'employees'],
   '/presence': ['presence-sessions', 'sites', 'employees'],
+  '/attendance': ['presence-sessions', 'sites', 'employees'],
+  '/alerts': ['employees', 'sites', 'active-presence-sessions', 'alert-location-logs'],
+  '/reports': [
+    'employees',
+    'departments',
+    'sites',
+    'presence-sessions',
+    'report-location-logs',
+  ],
   '/assignments': ['employee-sites', 'employees', 'sites'],
+  '/users': ['employees', 'employee-sites'],
+  '/settings': [],
   '/audit': ['audit-logs'],
 }
 
