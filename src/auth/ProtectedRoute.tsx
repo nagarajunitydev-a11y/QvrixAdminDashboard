@@ -2,7 +2,7 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../api/AuthProvider'
 
 export function ProtectedRoute() {
-  const { session, loading } = useAuth()
+  const { session, loading, isPasswordRecovery } = useAuth()
   const location = useLocation()
 
   if (loading) {
@@ -11,6 +11,10 @@ export function ProtectedRoute() {
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     )
+  }
+
+  if (isPasswordRecovery) {
+    return <Navigate to="/reset-password" replace />
   }
 
   if (!session) {

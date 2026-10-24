@@ -8,6 +8,7 @@ interface AuthContextType {
   session: Session | null
   user: User | null
   loading: boolean
+  isPasswordRecovery: boolean
   signIn: (email: string, password: string) => Promise<Session | null>
   signOut: () => Promise<void>
   isManager: boolean
@@ -28,6 +29,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(
+    () => new URLSearchParams(window.location.hash.slice(1)).get('type') === 'recovery'
+  )
 
   const role = user?.user_metadata?.role?.toString() ?? null
   const isManager = role === 'manager'
@@ -40,7 +44,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (event, session) => {
+        if (event === 'PASSWORD_RECOVERY') setIsPasswordRecovery(true)
+        if (event === 'SIGNED_OUT' || event === 'USER_UPDATED') setIsPasswordRecovery(false)
         setSession(session)
         setUser(session?.user ?? null)
         setLoading(false)
@@ -67,7 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ session, user, loading, signIn, signOut, isManager, role }}
+      value={{ session, user, loading, isPasswordRecovery, signIn, signOut, isManager, role }}
     >
       {children}
     </AuthContext.Provider>

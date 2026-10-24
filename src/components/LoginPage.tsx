@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../api/AuthProvider'
+import { supabase } from '../api/supabase'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
@@ -8,6 +9,8 @@ import { Alert, AlertDescription } from './ui/alert'
 import {
   ArrowRight,
   Building2,
+  Eye,
+  EyeOff,
   KeyRound,
   Lock,
   Mail,
@@ -37,23 +40,73 @@ const highlights = [
   },
 ]
 
-export function LoginPage() {
+export function LoginPage({ mode = 'login' }: { mode?: 'login' | 'forgot' | 'reset' }) {
   const [email, setEmail] = useState(() => localStorage.getItem(REMEMBER_KEY) ?? '')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+  const [resetComplete, setResetComplete] = useState(false)
+  const [recoveryError] = useState(() => {
+    const hash = new URLSearchParams(window.location.hash.slice(1))
+    const search = new URLSearchParams(window.location.search)
+    return hash.has('error') || hash.has('error_code') || search.has('error') || search.has('error_code')
+  })
   const [remember, setRemember] = useState(() => localStorage.getItem(REMEMBER_KEY) !== null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const { signIn } = useAuth()
+  const { signIn, session, loading, isPasswordRecovery, signOut } = useAuth()
+  const isReset = mode === 'reset'
+  const isForgot = mode === 'forgot'
+  const invalidReset = isReset && !loading && (!session || recoveryError) && !resetComplete
   const navigate = useNavigate()
   const location = useLocation()
 
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/'
 
+  const backToLogin = async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      if (isReset) await signOut()
+      navigate('/login', { replace: true })
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Unable to sign out. Please try again.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError(null)
+    setMessage(null)
     setIsLoading(true)
     try {
+      if (isForgot) {
+        const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+          redirectTo: new URL('/reset-password', window.location.origin).href,
+        })
+        if (error) throw error
+        setMessage('If an account exists for this email, you will receive a password reset link. Check your inbox and spam folder.')
+        return
+      }
+      if (isReset) {
+        if (invalidReset || loading) return
+        if (password !== confirmPassword) {
+          setError('Passwords do not match.')
+          return
+        }
+        const { error } = await supabase.auth.updateUser({ password })
+        if (error) throw error
+        setResetComplete(true)
+        setPassword('')
+        setConfirmPassword('')
+        setMessage('Your password has been updated. You can now sign in with your new password.')
+        await signOut()
+        return
+      }
       const session = await signIn(email, password)
       const role = session?.user?.user_metadata?.role?.toString() ?? null
       if (role !== 'manager') {
@@ -67,10 +120,14 @@ export function LoginPage() {
       }
       navigate(from, { replace: true })
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Login failed')
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
     } finally {
       setIsLoading(false)
     }
+  }
+
+  if (mode === 'login' && isPasswordRecovery) {
+    return <Navigate to="/reset-password" replace />
   }
 
   return (
@@ -182,9 +239,11 @@ export function LoginPage() {
               <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-inset ring-primary/15">
                 <KeyRound className="h-5 w-5" />
               </div>
-              <h2 className="font-headline text-headline-lg text-foreground">Welcome back</h2>
+              <h2 className="font-headline text-headline-lg text-foreground">
+                {isForgot ? 'Forgot password?' : isReset ? 'Reset your password' : 'Welcome back'}
+              </h2>
               <p className="mt-1 text-body-sm text-muted-foreground">
-                Sign in to the Crewtraxa manager console.
+                {isForgot ? 'Enter your email address to receive a password reset link.' : isReset ? 'Choose a new password for your account.' : 'Sign in to the Crewtraxa manager console.'}
               </p>
             </div>
 
@@ -194,64 +253,131 @@ export function LoginPage() {
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
+              {message && (
+                <Alert variant="success">
+                  <AlertDescription>{message}</AlertDescription>
+                </Alert>
+              )}
+              {invalidReset && (
+                <Alert variant="destructive">
+                  <AlertDescription>This password reset link is invalid or has expired. Request a new link to try again.</AlertDescription>
+                </Alert>
+              )}
+              {isReset && loading && <p role="status" className="text-body-sm text-muted-foreground">Checking your reset link...</p>}
 
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="email" className="text-label-md text-foreground">
-                  Email address
-                </Label>
-                <div className="relative">
-                  <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="you@company.com"
-                    className="h-10 pl-9"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    disabled={isLoading}
-                    autoComplete="email"
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password" className="text-label-md text-foreground">
-                    Password
+              {!isReset && (
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="email" className="text-label-md text-foreground">
+                    Email address
                   </Label>
-                  <span className="text-[10px] text-muted-foreground">Managed by your admin</span>
+                  <div className="relative">
+                    <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="you@company.com"
+                      className="h-10 pl-9"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      disabled={isLoading}
+                      autoComplete="email"
+                    />
+                  </div>
                 </div>
-                <div className="relative">
-                  <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="••••••••"
-                    className="h-10 pl-9"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    disabled={isLoading}
-                    autoComplete="current-password"
+              )}
+
+              {!isForgot && !resetComplete && !invalidReset && (
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password" className="text-label-md text-foreground">
+                      {isReset ? 'New password' : 'Password'}
+                    </Label>
+                    {!isReset && <Link to="/forgot-password" className="text-xs text-primary hover:underline">Forgot password?</Link>}
+                  </div>
+                  <div className="relative">
+                    <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="password"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="••••••••"
+                      className="h-10 pl-9 pr-12"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      disabled={isLoading || (isReset && loading)}
+                      minLength={isReset ? 8 : undefined}
+                      autoComplete={isReset ? 'new-password' : 'current-password'}
+                    />
+                    <button
+                      type="button"
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      aria-controls="password"
+                      aria-pressed={showPassword}
+                      onClick={() => setShowPassword((visible) => !visible)}
+                      disabled={isLoading || (isReset && loading)}
+                      className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {isReset && !resetComplete && !invalidReset && (
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="confirm-password">Confirm new password</Label>
+                  <div className="relative">
+                    <Input
+                      id="confirm-password"
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      minLength={8}
+                      required
+                      disabled={isLoading || loading}
+                      autoComplete="new-password"
+                      className="h-10 pr-12"
+                    />
+                    <button
+                      type="button"
+                      aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                      aria-controls="confirm-password"
+                      aria-pressed={showConfirmPassword}
+                      onClick={() => setShowConfirmPassword((visible) => !visible)}
+                      disabled={isLoading || loading}
+                      className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                    >
+                      {showConfirmPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
+                    </button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Use at least 8 characters.</p>
+                </div>
+              )}
+
+              {!isForgot && !isReset && (
+                <label className="flex cursor-pointer select-none items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={remember}
+                    onChange={(e) => setRemember(e.target.checked)}
+                    className="h-4 w-4 rounded border-input accent-primary"
                   />
+                  <span className="text-body-sm text-muted-foreground">Remember my email</span>
+                </label>
+              )}
+
+              {!resetComplete && !invalidReset && (
+                <Button type="submit" className="mt-1 h-10 w-full" disabled={isLoading || (isReset && loading)}>
+                  <span>{isForgot ? (isLoading ? 'Sending link...' : 'Send reset link') : isReset ? (isLoading ? 'Updating password...' : 'Update password') : (isLoading ? 'Signing in…' : 'Sign in')}</span>
+                  {!isLoading && <ArrowRight className="h-4 w-4" />}
+                </Button>
+              )}
+              {(isForgot || isReset) && (
+                <div className="flex flex-col items-center gap-3 text-body-sm">
+                  {invalidReset && <Link to="/forgot-password" className="text-primary hover:underline">Request a new reset link</Link>}
+                  <Button type="button" variant="link" disabled={isLoading || (isReset && loading)} onClick={backToLogin}>Back to sign in</Button>
                 </div>
-              </div>
-
-              <label className="flex cursor-pointer select-none items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={remember}
-                  onChange={(e) => setRemember(e.target.checked)}
-                  className="h-4 w-4 rounded border-input accent-primary"
-                />
-                <span className="text-body-sm text-muted-foreground">Remember my email</span>
-              </label>
-
-              <Button type="submit" className="mt-1 h-10 w-full" disabled={isLoading}>
-                <span>{isLoading ? 'Signing in…' : 'Sign in'}</span>
-                {!isLoading && <ArrowRight className="h-4 w-4" />}
-              </Button>
+              )}
             </form>
 
             <div className="mt-5 flex items-center gap-2 border-t border-border/60 pt-4 text-[11px] text-muted-foreground">

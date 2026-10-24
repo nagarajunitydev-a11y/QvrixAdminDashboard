@@ -33,7 +33,9 @@ function App() {
           <ToastProvider>
             <BrowserRouter>
               <Routes>
-                <Route path="/login" element={<LoginPage />} />
+                <Route path="/login" element={<LoginPage key="login" />} />
+                <Route path="/forgot-password" element={<LoginPage key="forgot" mode="forgot" />} />
+                <Route path="/reset-password" element={<LoginPage key="reset" mode="reset" />} />
                 <Route element={<ProtectedRoute />}>
                   <Route element={<ManagerLayout />}>
                     <Route path="/" element={<DashboardPage />} />

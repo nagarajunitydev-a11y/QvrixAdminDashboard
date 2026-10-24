@@ -1,5 +1,24 @@
 # React + TypeScript + Vite
 
+## Password recovery
+
+The sign-in page includes a **Forgot password?** link. Users enter their email,
+follow the Supabase recovery email, and choose and confirm a new password at
+`/reset-password`. Passwords must contain at least 8 characters; any stricter
+password policy configured in Supabase also applies.
+
+In Supabase **Authentication → URL Configuration**, add the application's
+`https://<your-domain>/reset-password` URL to **Redirect URLs**, along with
+`http://localhost:5173/reset-password` for local development. Set **Site URL** to
+the deployed application's URL and configure email delivery for recovery emails.
+The host must serve the application for `/forgot-password` and `/reset-password`
+(the included Vercel rewrite already supports these routes).
+
+To verify, request a reset for a test account, open the email link, confirm that
+mismatched passwords are rejected, save a new password, and sign in with it.
+Also check an expired link and opening `/reset-password` while signed out; both
+should offer a new reset link.
+
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 
 Currently, two official plugins are available:

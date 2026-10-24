@@ -305,7 +305,7 @@ export function UsersRolesPage() {
 
           <div className="border-t border-border/70 px-4 py-2.5 text-[10px] text-muted-foreground">
             Account linkage comes from the employee record&apos;s Supabase user ID. New auth users
-            and password resets are managed in Supabase.
+            are managed in Supabase. Users can reset their password from the sign-in page.
           </div>
         </section>
 
