@@ -1,10 +1,12 @@
 import { Outlet } from 'react-router-dom'
 import { Navbar, Sidebar, useSidebarState } from '../components/Sidebar'
 import { useRouteDataRefresh } from '../hooks/useRouteDataRefresh'
+import { useOrganization } from '../api/OrganizationProvider'
 import { cn } from '@/lib/utils'
 
 export function ManagerLayout() {
   const sidebar = useSidebarState()
+  const { organization } = useOrganization()
 
   // Refetch the selected page's data from Supabase on every menu click.
   useRouteDataRefresh()
@@ -29,7 +31,8 @@ export function ManagerLayout() {
           collapsed={sidebar.collapsed}
         />
         <main className="scrollbar-thin flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
-          <div key="route" className="animate-fade-in">
+          {/* Remount pages on organization switch so no filter or draft carries over. */}
+          <div key={organization?.id ?? 'route'} className="animate-fade-in">
             <Outlet />
           </div>
         </main>

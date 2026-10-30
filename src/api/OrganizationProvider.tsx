@@ -1,0 +1,91 @@
+import { createContext, useCallback, useContext, useState, type ReactNode } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { supabase } from './supabase'
+import { useAuth } from './AuthProvider'
+import { setCurrentOrganizationId } from './organizationScope'
+import {
+  consoleCapabilities,
+  resolveActiveOrganization,
+  type ConsoleAccess,
+  type ConsoleOrganization,
+  type ConsoleRole,
+} from '@/lib/consoleAccess'
+
+const ACTIVE_ORGANIZATION_KEY = 'crewtraxa-active-organization'
+
+export const consoleAccessKey = (userId: string | undefined) => ['console-access', userId ?? null] as const
+
+/** Console access comes from server-side organization membership, never editable user metadata. */
+export async function fetchConsoleAccess(): Promise<ConsoleAccess> {
+  const { data, error } = await supabase.rpc('my_console_access')
+  if (error) throw error
+  return data as ConsoleAccess
+}
+
+interface OrganizationContextValue {
+  loading: boolean
+  error: unknown
+  retry: () => void
+  organizations: ConsoleOrganization[]
+  organization: ConsoleOrganization | null
+  role: ConsoleRole | null
+  isPlatformAdmin: boolean
+  canManage: boolean
+  isOrgAdmin: boolean
+  switchOrganization: (id: string) => void
+}
+
+const OrganizationContext = createContext<OrganizationContextValue | undefined>(undefined)
+
+export function useOrganization() {
+  const context = useContext(OrganizationContext)
+  if (!context) throw new Error('useOrganization must be used within OrganizationProvider')
+  return context
+}
+
+export function OrganizationProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth()
+  const queryClient = useQueryClient()
+  const [storedId, setStoredId] = useState(() => localStorage.getItem(ACTIVE_ORGANIZATION_KEY))
+  const accessQuery = useQuery({
+    queryKey: consoleAccessKey(user?.id),
+    queryFn: fetchConsoleAccess,
+    enabled: Boolean(user),
+    staleTime: 60_000,
+  })
+
+  const access = accessQuery.data
+  const organization = user ? resolveActiveOrganization(access, storedId) : null
+  // Set during render so queries started by child pages already see the organization.
+  setCurrentOrganizationId(organization?.id ?? null)
+
+  const switchOrganization = useCallback((id: string) => {
+    if (!access?.organizations.some((candidate) => candidate.id === id)) return
+    setCurrentOrganizationId(id)
+    // Drop every cached page so no data from the previous organization is shown.
+    queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== 'console-access' })
+    localStorage.setItem(ACTIVE_ORGANIZATION_KEY, id)
+    setStoredId(id)
+  }, [access, queryClient])
+
+  const isPlatformAdmin = access?.is_platform_admin ?? false
+  const role = organization?.role ?? null
+
+  return (
+    <OrganizationContext.Provider
+      value={{
+        loading: Boolean(user) && accessQuery.isPending,
+        error: accessQuery.error,
+        retry: () => void accessQuery.refetch(),
+        organizations: access?.organizations ?? [],
+        organization,
+        role,
+        isPlatformAdmin,
+        ...consoleCapabilities(role, isPlatformAdmin),
+        switchOrganization,
+      }}
+    >
+      {children}
+    </OrganizationContext.Provider>
+  )
+}

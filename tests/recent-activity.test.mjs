@@ -11,8 +11,8 @@ function compile(path) {
 }
 const eventsUrl = moduleUrl(compile('../src/lib/recentActivity.ts'))
 const { recentActivityEvents } = await import(eventsUrl)
-const session = { id: 1, user_id: 'user', site_id: 'site', entry_timestamp: 1000, exit_timestamp: null }
-const location = { id: 1, user_id: 'user', site_id: 'site', timestamp: 2000, is_inside: true }
+const session = { id: 1, user_id: 'user', site_id: 'site', entry_timestamp: 1000, exit_timestamp: null, organization_id: 'org-1' }
+const location = { id: 1, user_id: 'user', site_id: 'site', timestamp: 2000, is_inside: true, organization_id: 'org-1' }
 
 test('checkout is shown at its recorded exit time even when the last GPS fix says inside', () => {
   const events = recentActivityEvents([{ ...session, exit_timestamp: 3000 }], [location], 5, 10_000)
@@ -95,8 +95,12 @@ const transportUrl = moduleUrl(`
   } };
 `)
 const { state } = await import(transportUrl)
+const scopeUrl = moduleUrl(compile('../src/api/organizationScope.ts'))
+const { setCurrentOrganizationId } = await import(scopeUrl)
+setCurrentOrganizationId('org-1')
 const { fetchRecentActivity } = await import(moduleUrl(compile('../src/api/recentActivity.ts')
   .replace("'./supabase'", JSON.stringify(transportUrl))
+  .replace("'./organizationScope'", JSON.stringify(scopeUrl))
   .replace("'../lib/recentActivity'", JSON.stringify(eventsUrl))))
 
 test('reader orders checkouts independently and loads the predecessor needed to confirm a window-boundary exit', async () => {
@@ -124,4 +128,15 @@ test('reader does not truncate GPS history at the server cap and reports read er
   await assert.rejects(fetchRecentActivity(), /Read failed/)
   state.fail = null
   state.cap = 500
+})
+test('reader only returns activity from the selected organization', async () => {
+  state.calls = []
+  state.rows = {
+    presence_sessions: [{ ...session, exit_timestamp: 3000 }, { ...session, id: 9, user_id: 'other', organization_id: 'org-2', entry_timestamp: 5000 }],
+    location_logs: [location, { ...location, id: 9, user_id: 'other', organization_id: 'org-2', timestamp: 6000 }],
+  }
+  const snapshot = await fetchRecentActivity()
+  assert.ok(snapshot.sessions.every((row) => row.organization_id === 'org-1'))
+  assert.ok(snapshot.locations.every((row) => row.organization_id === 'org-1'))
+  assert.ok(state.calls.every((call) => call.filters.some(([operator, column, value]) => operator === 'eq' && column === 'organization_id' && value === 'org-1')))
 })

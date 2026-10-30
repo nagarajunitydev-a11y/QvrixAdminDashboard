@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { mutationError } from './mutationErrors'
+import { currentOrganizationId } from './organizationScope'
 import type {
   Site,
   SiteInsert,
@@ -48,13 +49,13 @@ async function deleteRecord(table: string, id: string, label: string): Promise<v
 
 // Sites
 export async function fetchSites(): Promise<Site[]> {
-  const { data, error } = await from('sites').select('*')
+  const { data, error } = await from('sites').select('*').eq('organization_id', currentOrganizationId())
   if (error) throw error
   return data
 }
 
 export async function createSite(payload: SiteInsert): Promise<Site> {
-  const { data, error } = await from('sites').insert(payload).select().single()
+  const { data, error } = await from('sites').insert({ ...payload, organization_id: currentOrganizationId() }).select().single()
   if (error) throw mutationError(error, 'create this site')
   return data
 }
@@ -117,7 +118,7 @@ export async function fetchLocationLogs(params?: {
   limit?: number
   offset?: number
 }): Promise<LocationLog[]> {
-  let query = from('location_logs').select('*')
+  let query = from('location_logs').select('*').eq('organization_id', currentOrganizationId())
   if (params?.userId) query = query.eq('user_id', params.userId)
   if (params?.siteId) query = query.eq('site_id', params.siteId)
   if (params?.startDate) query = query.gte('timestamp', params.startDate)
@@ -141,6 +142,7 @@ export async function fetchPresenceSessions(params?: {
   endDate?: string
 }): Promise<Array<PresenceSession & { sites: Pick<Site, 'name' | 'latitude' | 'longitude'> | null }>> {
   let query = from('presence_sessions').select('*, sites(name,latitude,longitude)')
+    .eq('organization_id', currentOrganizationId())
   if (params?.userId) query = query.eq('user_id', params.userId)
   if (params?.siteId) query = query.eq('site_id', params.siteId)
   if (params?.startDate) query = query.gte('created_at', params.startDate)
@@ -153,13 +155,14 @@ export async function fetchPresenceSessions(params?: {
 
 // Departments
 export async function fetchDepartments(): Promise<Department[]> {
-  const { data, error } = await from('departments').select('*').order('name')
+  const { data, error } = await from('departments').select('*')
+    .eq('organization_id', currentOrganizationId()).order('name')
   if (error) throw error
   return data
 }
 
 export async function createDepartment(payload: DepartmentInsert): Promise<Department> {
-  const { data, error } = await from('departments').insert(payload).select().single()
+  const { data, error } = await from('departments').insert({ ...payload, organization_id: currentOrganizationId() }).select().single()
   if (error) throw error
   return data
 }
@@ -180,13 +183,14 @@ export async function deleteDepartment(id: string): Promise<void> {
 
 // Designations
 export async function fetchDesignations(): Promise<Designation[]> {
-  const { data, error } = await from('designations').select('*').order('name')
+  const { data, error } = await from('designations').select('*')
+    .eq('organization_id', currentOrganizationId()).order('name')
   if (error) throw error
   return data
 }
 
 export async function createDesignation(payload: DesignationInsert): Promise<Designation> {
-  const { data, error } = await from('designations').insert(payload).select().single()
+  const { data, error } = await from('designations').insert({ ...payload, organization_id: currentOrganizationId() }).select().single()
   if (error) throw error
   return data
 }
@@ -209,13 +213,14 @@ export async function deleteDesignation(id: string): Promise<void> {
 export async function fetchShifts(): Promise<ShiftWithDepartment[]> {
   const { data, error } = await from('shifts')
     .select('*, departments(name)')
+    .eq('organization_id', currentOrganizationId())
     .order('name')
   if (error) throw error
   return data
 }
 
 export async function createShift(payload: ShiftInsert): Promise<Shift> {
-  const { data, error } = await from('shifts').insert(payload).select().single()
+  const { data, error } = await from('shifts').insert({ ...payload, organization_id: currentOrganizationId() }).select().single()
   if (error) throw error
   return data
 }
@@ -238,6 +243,7 @@ export async function deleteShift(id: string): Promise<void> {
 export async function fetchEmployees(): Promise<EmployeeWithRelations[]> {
   const { data, error } = await from('employees')
     .select('*, departments(name), designations(name), shifts(name)')
+    .eq('organization_id', currentOrganizationId())
     .order('last_name')
   if (error) throw error
   return data
@@ -253,7 +259,7 @@ export async function fetchEmployee(id: string): Promise<EmployeeWithRelations> 
 }
 
 export async function createEmployee(payload: EmployeeInsert): Promise<Employee> {
-  const { data, error } = await from('employees').insert(payload).select().single()
+  const { data, error } = await from('employees').insert({ ...payload, organization_id: currentOrganizationId() }).select().single()
   if (error) throw error
   return data
 }
@@ -276,6 +282,7 @@ export async function deleteEmployee(id: string): Promise<void> {
 export async function fetchEmployeeSites(employeeId?: string): Promise<EmployeeSiteWithSite[]> {
   let query = from('employee_sites')
     .select('*, sites(id,name)')
+    .eq('organization_id', currentOrganizationId())
     .order('assigned_at', { ascending: false })
   if (employeeId) query = query.eq('employee_id', employeeId)
   const { data, error } = await query
@@ -310,7 +317,7 @@ export async function fetchAuditLogs(params?: {
   limit?: number
   offset?: number
 }): Promise<AuditLog[]> {
-  let query = from('audit_logs').select('*')
+  let query = from('audit_logs').select('*').eq('organization_id', currentOrganizationId())
   if (params?.tableName) query = query.eq('table_name', params.tableName)
   if (params?.startDate) query = query.gte('created_at', params.startDate)
   if (params?.endDate) query = query.lte('created_at', params.endDate)
@@ -336,6 +343,7 @@ export async function fetchEmployeeLocations(): Promise<
   const { data, error } = await supabase
     .from('employees')
     .select('id,first_name,last_name,sites!employee_sites_sites!inner(id,name,latitude,longitude,radius_in_meters)')
+    .eq('organization_id', currentOrganizationId())
   if (error) throw error
   return data
 }
@@ -347,6 +355,7 @@ export async function fetchActivePresenceSessions(): Promise<PresenceSession[]> 
   const { data, error } = await supabase
     .from('presence_sessions')
     .select('*')
+    .eq('organization_id', currentOrganizationId())
     .is('exit_timestamp', null)
   if (error) throw error
   return data

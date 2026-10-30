@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../api/AuthProvider'
+import { consoleAccessKey, fetchConsoleAccess } from '../api/OrganizationProvider'
+import { queryClient } from '../api/queryClient'
 import { supabase } from '../api/supabase'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
@@ -109,9 +111,13 @@ export function LoginPage({ mode = 'login' }: { mode?: 'login' | 'forgot' | 'res
         return
       }
       const session = await signIn(email, password)
-      const role = session?.user?.user_metadata?.role?.toString() ?? null
-      if (role !== 'manager') {
-        setError('Access denied. Only managers can log in.')
+      // Console access is an organization role checked by the server, not editable profile data.
+      const access = session
+        ? await queryClient.fetchQuery({ queryKey: consoleAccessKey(session.user.id), queryFn: fetchConsoleAccess })
+        : null
+      if (!access?.organizations.length) {
+        await signOut()
+        setError('This account has no Crewtraxa Console role. Field employees sign in on the Crewtraxa Employee app.')
         return
       }
       if (remember) {
@@ -383,7 +389,7 @@ export function LoginPage({ mode = 'login' }: { mode?: 'login' | 'forgot' | 'res
 
             <div className="mt-5 flex items-center gap-2 border-t border-border/60 pt-4 text-[11px] text-muted-foreground">
               <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
-              Manager role required. Access is checked after authentication.
+              Organization role required. Access is checked after authentication.
             </div>
           </div>
 

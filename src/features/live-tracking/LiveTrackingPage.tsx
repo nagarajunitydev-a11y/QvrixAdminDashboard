@@ -6,6 +6,8 @@ import {
   fetchSites,
   type EmployeeWithRelations,
 } from '@/api/services'
+import { fetchUnlinkedAccounts } from '@/api/organizations'
+import { unlinkedAccountLabel } from '@/lib/consoleAccess'
 import type { LocationLog, PresenceSession } from '@/types'
 import { PageHeader } from '@/components/ui/page-header'
 import { StatCard } from '@/components/ui/stat-card'
@@ -97,6 +99,12 @@ export function LiveTrackingPage() {
 
   const employeesQuery = useQuery({ queryKey: ['employees'], queryFn: fetchEmployees, refetchInterval: 15_000 })
   const sitesQuery = useQuery({ queryKey: ['sites'], queryFn: fetchSites, refetchInterval: 15_000 })
+  // Sign-in emails for accounts without an employee profile; labels never use device or ID prefixes.
+  const unlinkedQuery = useQuery({ queryKey: ['unlinked-accounts'], queryFn: fetchUnlinkedAccounts, refetchInterval: 15_000 })
+  const unlinkedEmails = useMemo(
+    () => new Map((unlinkedQuery.data ?? []).map((account) => [account.user_id, account.email ?? ''])),
+    [unlinkedQuery.data]
+  )
   const employees = useMemo(() => employeesQuery.data ?? [], [employeesQuery.data])
   const sites = useMemo(() => sitesQuery.data ?? [], [sitesQuery.data])
   const { counts, snapshotQuery, assignmentsQuery, now } = useWorkforceTracking(
@@ -138,7 +146,7 @@ export function LiveTrackingPage() {
       }
     })
 
-    // Get all sessions for unlinked devices
+    // Sessions from accounts that are not linked to an employee profile
     const allSessionUserIds = new Set(
       sessions
         .map((s) => s.user_id)
@@ -156,8 +164,8 @@ export function LiveTrackingPage() {
         return {
           id: `session:${userId}`,
           employee: null,
-          name: `Unlinked device ${userId.slice(0, 8)}`,
-          email: '',
+          name: unlinkedAccountLabel(unlinkedEmails.get(userId)),
+          email: unlinkedEmails.get(userId) ?? '',
           latest,
           session,
           status,
@@ -172,7 +180,7 @@ export function LiveTrackingPage() {
       ))
 
     return [...employeeRows, ...deviceRows]
-  }, [employees, latestByUser, sessionByUser, sessions, siteById, counts, now])
+  }, [employees, latestByUser, sessionByUser, sessions, siteById, counts, now, unlinkedEmails])
 
   const stats = useMemo(() => {
     return {

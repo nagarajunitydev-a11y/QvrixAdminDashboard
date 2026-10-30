@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useIsFetching, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../api/AuthProvider'
+import { useOrganization } from '../api/OrganizationProvider'
+import { roleLabels } from '@/lib/consoleAccess'
 import { refreshPageData } from '../hooks/useRouteDataRefresh'
 import { useTheme } from './ThemeProvider'
 import {
@@ -14,6 +16,7 @@ import {
   ClipboardList,
   Clock,
   History,
+  Landmark,
   LayoutDashboard,
   LogOut,
   MapPinned,
@@ -22,6 +25,7 @@ import {
   Radar,
   ScrollText,
   Settings,
+  Smartphone,
   Sun,
   UserCog,
   Users,
@@ -63,6 +67,8 @@ const navGroups = [
       { label: 'Designations', to: '/designations', icon: Briefcase },
       { label: 'Assignments', to: '/assignments', icon: ClipboardList },
       { label: 'Users & Roles', to: '/users', icon: UserCog },
+      { label: 'Devices', to: '/devices', icon: Smartphone },
+      { label: 'Organizations', to: '/organizations', icon: Landmark, platformOnly: true },
       { label: 'Audit Logs', to: '/audit', icon: ScrollText },
       { label: 'Settings', to: '/settings', icon: Settings },
     ],
@@ -85,6 +91,8 @@ const routeTitles: Array<[string, string]> = [
   ['/designations', 'Designations'],
   ['/assignments', 'Assignments'],
   ['/users', 'Users & Roles'],
+  ['/devices', 'Devices'],
+  ['/organizations', 'Organizations'],
   ['/audit', 'Audit Logs'],
   ['/settings', 'Settings'],
   ['/', 'Dashboard'],
@@ -120,7 +128,8 @@ export function Navbar({
   onToggleCollapse?: () => void
   collapsed?: boolean
 }) {
-  const { signOut, user, role } = useAuth()
+  const { signOut, user } = useAuth()
+  const { role } = useOrganization()
   const { resolvedTheme, toggleTheme } = useTheme()
   const location = useLocation()
   const isRefreshing = useIsFetching() > 0
@@ -185,7 +194,7 @@ export function Navbar({
               {user?.email ?? 'Administrator'}
             </span>
             <span className="font-label text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-              {role ?? 'Operator'}
+              {role ? roleLabels[role] : 'Operator'}
             </span>
           </div>
         </div>
@@ -216,7 +225,8 @@ export function Sidebar({
   onToggleCollapse?: () => void
 }) {
   const location = useLocation()
-  const { user, role } = useAuth()
+  const { user } = useAuth()
+  const { organization, organizations, role, isPlatformAdmin, switchOrganization } = useOrganization()
   const queryClient = useQueryClient()
   const [isDesktop, setIsDesktop] = useState(false)
 
@@ -266,8 +276,35 @@ export function Sidebar({
         )}
       </div>
 
+      {!isCollapsed && organization && (
+        <div className="border-b border-sidebar-border px-4 py-3">
+          <label
+            htmlFor="active-organization"
+            className="mb-1 block font-label text-[10px] font-semibold uppercase tracking-[0.16em] text-sidebar-muted/70"
+          >
+            Organization
+          </label>
+          {organizations.length > 1 ? (
+            <select
+              id="active-organization"
+              value={organization.id}
+              onChange={(event) => switchOrganization(event.target.value)}
+              className="w-full truncate rounded-lg border border-white/10 bg-sidebar-hover/60 px-2.5 py-1.5 font-label text-label-md text-white focus:outline-none focus:ring-2 focus:ring-sidebar-active/50"
+            >
+              {organizations.map((option) => (
+                <option key={option.id} value={option.id} className="text-foreground">
+                  {option.name}{option.is_active ? '' : ' (inactive)'}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <p id="active-organization" className="truncate font-label text-label-md text-white">{organization.name}</p>
+          )}
+        </div>
+      )}
+
       <div className="scrollbar-thin flex-1 overflow-y-auto overflow-x-hidden px-3 py-4">
-        {navGroups.map((group) => (
+        {navGroups.map((group) => ({ ...group, items: group.items.filter((item) => !('platformOnly' in item) || isPlatformAdmin) })).map((group) => (
           <div key={group.label} className="mb-4 last:mb-0">
             <p
               className={cn(
@@ -327,7 +364,7 @@ export function Sidebar({
                 {user?.email?.split('@')[0] ?? 'Admin User'}
               </span>
               <span className="truncate font-label text-[10px] uppercase tracking-[0.14em] text-sidebar-muted">
-                {role ?? 'Operator'}
+                {role ? roleLabels[role] : 'Operator'}
               </span>
             </div>
           )}

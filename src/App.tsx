@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider } from './api/AuthProvider'
+import { OrganizationProvider } from './api/OrganizationProvider'
 import { queryClient } from './api/queryClient'
 import { ProtectedRoute } from './auth/ProtectedRoute'
 import { ThemeProvider } from './components/ThemeProvider'
@@ -22,6 +23,8 @@ import { PresenceSessionsPage } from './features/presence/PresenceSessionsPage'
 import { AssignmentsPage } from './features/employee-sites/AssignmentsPage'
 import { AlertsPage } from './features/alerts/AlertsPage'
 import { ReportsPage } from './features/reports/ReportsPage'
+import { DevicesPage } from './features/devices/DevicesPage'
+import { OrganizationsPage } from './features/organizations/OrganizationsPage'
 import { UsersRolesPage } from './features/users/UsersRolesPage'
 import { SettingsPage } from './features/settings/SettingsPage'
 import { AuditLogsPage } from './features/audit-logs/AuditLogsPage'
@@ -30,40 +33,44 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <ThemeProvider>
-          <ToastProvider>
-            <BrowserRouter>
-              <Routes>
-                <Route path="/login" element={<LoginPage key="login" />} />
-                <Route path="/forgot-password" element={<LoginPage key="forgot" mode="forgot" />} />
-                <Route path="/reset-password" element={<LoginPage key="reset" mode="reset" />} />
-                <Route element={<ProtectedRoute />}>
-                  <Route element={<ManagerLayout />}>
-                    <Route path="/" element={<DashboardPage />} />
-                    <Route path="/live-tracking" element={<LiveTrackingPage />} />
-                    <Route path="/employees" element={<EmployeesPage />} />
-                    <Route path="/departments" element={<DepartmentsPage />} />
-                    <Route path="/designations" element={<DesignationsPage />} />
-                    <Route path="/shifts" element={<ShiftsPage />} />
-                    <Route path="/sites" element={<SitesPage />} />
-                    <Route path="/site-workers" element={<SiteWorkersPage />} />
-                    <Route path="/attendance" element={<PresenceSessionsPage />} />
-                    <Route path="/presence" element={<PresenceSessionsPage />} />
-                    <Route path="/history" element={<LocationLogsPage />} />
-                    <Route path="/location-logs" element={<LocationLogsPage />} />
-                    <Route path="/alerts" element={<AlertsPage />} />
-                    <Route path="/reports" element={<ReportsPage />} />
-                    <Route path="/assignments" element={<AssignmentsPage />} />
-                    <Route path="/users" element={<UsersRolesPage />} />
-                    <Route path="/settings" element={<SettingsPage />} />
-                    <Route path="/audit" element={<AuditLogsPage />} />
+        <OrganizationProvider>
+          <ThemeProvider>
+            <ToastProvider>
+              <BrowserRouter>
+                <Routes>
+                  <Route path="/login" element={<LoginPage key="login" />} />
+                  <Route path="/forgot-password" element={<LoginPage key="forgot" mode="forgot" />} />
+                  <Route path="/reset-password" element={<LoginPage key="reset" mode="reset" />} />
+                  <Route element={<ProtectedRoute />}>
+                    <Route element={<ManagerLayout />}>
+                      <Route path="/" element={<DashboardPage />} />
+                      <Route path="/live-tracking" element={<LiveTrackingPage />} />
+                      <Route path="/employees" element={<EmployeesPage />} />
+                      <Route path="/departments" element={<DepartmentsPage />} />
+                      <Route path="/designations" element={<DesignationsPage />} />
+                      <Route path="/shifts" element={<ShiftsPage />} />
+                      <Route path="/sites" element={<SitesPage />} />
+                      <Route path="/site-workers" element={<SiteWorkersPage />} />
+                      <Route path="/attendance" element={<PresenceSessionsPage />} />
+                      <Route path="/presence" element={<PresenceSessionsPage />} />
+                      <Route path="/history" element={<LocationLogsPage />} />
+                      <Route path="/location-logs" element={<LocationLogsPage />} />
+                      <Route path="/alerts" element={<AlertsPage />} />
+                      <Route path="/reports" element={<ReportsPage />} />
+                      <Route path="/assignments" element={<AssignmentsPage />} />
+                      <Route path="/users" element={<UsersRolesPage />} />
+                      <Route path="/devices" element={<DevicesPage />} />
+                      <Route path="/organizations" element={<OrganizationsPage />} />
+                      <Route path="/settings" element={<SettingsPage />} />
+                      <Route path="/audit" element={<AuditLogsPage />} />
+                    </Route>
                   </Route>
-                </Route>
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </BrowserRouter>
-          </ToastProvider>
-        </ThemeProvider>
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </BrowserRouter>
+            </ToastProvider>
+          </ThemeProvider>
+        </OrganizationProvider>
       </AuthProvider>
     </QueryClientProvider>
   )

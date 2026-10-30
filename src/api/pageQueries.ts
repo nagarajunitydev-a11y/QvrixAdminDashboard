@@ -10,7 +10,7 @@
  */
 export const PAGE_QUERY_KEYS: Record<string, string[]> = {
   '/': ['sites', 'employees', 'workforce-tracking', 'employee-sites', 'recent-entry-exit-activity'],
-  '/live-tracking': ['employees', 'sites', 'workforce-tracking', 'employee-sites'],
+  '/live-tracking': ['employees', 'sites', 'workforce-tracking', 'employee-sites', 'unlinked-accounts'],
   '/employees': ['employees', 'departments', 'designations', 'shifts', 'sites', 'employee-sites'],
   '/departments': ['departments'],
   '/designations': ['designations'],
@@ -30,7 +30,9 @@ export const PAGE_QUERY_KEYS: Record<string, string[]> = {
     'report-location-logs',
   ],
   '/assignments': ['employee-sites', 'employees', 'sites'],
-  '/users': ['employees', 'employee-sites'],
+  '/users': ['employees', 'employee-sites', 'organization-members', 'employee-account-candidates'],
+  '/devices': ['devices', 'employees', 'unlinked-accounts', 'device-history'],
+  '/organizations': ['console-access'],
   '/settings': [],
   '/audit': ['audit-logs'],
 }

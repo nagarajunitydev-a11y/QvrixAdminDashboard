@@ -62,6 +62,7 @@ export interface Database {
     Tables: {
       sites: {
         Row: {
+          organization_id: string
           id: string
           name: string
           latitude: number
@@ -71,6 +72,7 @@ export interface Database {
           updated_at: string
         }
         Insert: {
+          organization_id?: string
           id?: string
           name: string
           latitude: number
@@ -80,6 +82,7 @@ export interface Database {
           updated_at?: string
         }
         Update: {
+          organization_id?: string
           id?: string
           name?: string
           latitude?: number
@@ -91,6 +94,7 @@ export interface Database {
       }
       location_logs: {
         Row: {
+          organization_id: string
           id: number
           user_id: string
           site_id: string | null
@@ -104,6 +108,7 @@ export interface Database {
           created_at: string
         }
         Insert: {
+          organization_id?: string
           id?: number
           user_id: string
           site_id?: string | null
@@ -117,6 +122,7 @@ export interface Database {
           created_at?: string
         }
         Update: {
+          organization_id?: string
           id?: number
           user_id?: string
           site_id?: string | null
@@ -132,6 +138,8 @@ export interface Database {
       }
       presence_sessions: {
         Row: {
+          organization_id: string
+          closed_by: 'employee' | 'auto_stale' | 'manager' | null
           id: number
           user_id: string
           site_id: string
@@ -142,6 +150,8 @@ export interface Database {
           created_at: string
         }
         Insert: {
+          organization_id?: string
+          closed_by?: 'employee' | 'auto_stale' | 'manager' | null
           id?: number
           user_id: string
           site_id: string
@@ -152,6 +162,8 @@ export interface Database {
           created_at?: string
         }
         Update: {
+          organization_id?: string
+          closed_by?: 'employee' | 'auto_stale' | 'manager' | null
           id?: number
           user_id?: string
           site_id?: string
@@ -164,6 +176,7 @@ export interface Database {
       }
       departments: {
         Row: {
+          organization_id: string
           id: string
           name: string
           description: string | null
@@ -171,6 +184,7 @@ export interface Database {
           updated_at: string
         }
         Insert: {
+          organization_id?: string
           id?: string
           name: string
           description?: string | null
@@ -178,6 +192,7 @@ export interface Database {
           updated_at?: string
         }
         Update: {
+          organization_id?: string
           id?: string
           name?: string
           description?: string | null
@@ -187,6 +202,7 @@ export interface Database {
       }
       designations: {
         Row: {
+          organization_id: string
           id: string
           name: string
           description: string | null
@@ -194,6 +210,7 @@ export interface Database {
           updated_at: string
         }
         Insert: {
+          organization_id?: string
           id?: string
           name: string
           description?: string | null
@@ -201,6 +218,7 @@ export interface Database {
           updated_at?: string
         }
         Update: {
+          organization_id?: string
           id?: string
           name?: string
           description?: string | null
@@ -210,6 +228,7 @@ export interface Database {
       }
       shifts: {
         Row: {
+          organization_id: string
           id: string
           name: string
           start_time: string
@@ -219,6 +238,7 @@ export interface Database {
           updated_at: string
         }
         Insert: {
+          organization_id?: string
           id?: string
           name: string
           start_time: string
@@ -228,6 +248,7 @@ export interface Database {
           updated_at?: string
         }
         Update: {
+          organization_id?: string
           id?: string
           name?: string
           start_time?: string
@@ -239,6 +260,7 @@ export interface Database {
       }
       employees: {
         Row: {
+          organization_id: string
           id: string
           user_id: string | null
           first_name: string
@@ -254,6 +276,7 @@ export interface Database {
           updated_at: string
         }
         Insert: {
+          organization_id?: string
           id?: string
           user_id?: string | null
           first_name: string
@@ -269,6 +292,7 @@ export interface Database {
           updated_at?: string
         }
         Update: {
+          organization_id?: string
           id?: string
           user_id?: string
           first_name?: string
@@ -286,16 +310,19 @@ export interface Database {
       }
       employee_sites: {
         Row: {
+          organization_id: string
           employee_id: string
           site_id: string
           assigned_at: string
         }
         Insert: {
+          organization_id?: string
           employee_id: string
           site_id: string
           assigned_at?: string
         }
         Update: {
+          organization_id?: string
           employee_id?: string
           site_id?: string
           assigned_at?: string
@@ -303,6 +330,7 @@ export interface Database {
       }
       audit_logs: {
         Row: {
+          organization_id: string | null
           id: number
           user_id: string | null
           action: string
@@ -313,6 +341,7 @@ export interface Database {
           created_at: string
         }
         Insert: {
+          organization_id?: string | null
           id?: number
           user_id?: string | null
           action: string
@@ -323,6 +352,7 @@ export interface Database {
           created_at?: string
         }
         Update: {
+          organization_id?: string | null
           id?: number
           user_id?: string | null
           action?: string

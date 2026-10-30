@@ -1,5 +1,8 @@
 import { useMemo } from 'react'
 import { useAuth } from '@/api/AuthProvider'
+import { useOrganization } from '@/api/OrganizationProvider'
+import { roleLabels } from '@/lib/consoleAccess'
+import { OrganizationSettings } from './OrganizationSettings'
 import { useTheme, type Theme } from '@/components/ThemeProvider'
 import { PageHeader } from '@/components/ui/page-header'
 import { Badge } from '@/components/ui/badge'
@@ -59,7 +62,8 @@ const alertRules = [
 
 export function SettingsPage() {
   const { theme, resolvedTheme, setTheme } = useTheme()
-  const { user, role, signOut } = useAuth()
+  const { user, signOut } = useAuth()
+  const { role } = useOrganization()
   const { toast } = useToast()
 
   const projectHost = useMemo(() => {
@@ -90,6 +94,8 @@ export function SettingsPage() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-4">
+          <OrganizationSettings />
+
           <section className="surface-panel p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -175,7 +181,7 @@ export function SettingsPage() {
                 <dt className="text-body-sm text-muted-foreground">Console role</dt>
                 <dd>
                   <Badge variant="success" dot>
-                    {role ?? 'Unknown'}
+                    {role ? roleLabels[role] : 'Unknown'}
                   </Badge>
                 </dd>
               </div>
@@ -195,7 +201,7 @@ export function SettingsPage() {
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
               <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                 <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
-                Manager access is required to open this console.
+                An organization role is required to open this console.
               </p>
               <Button
                 variant="outline"

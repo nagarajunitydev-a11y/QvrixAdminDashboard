@@ -86,24 +86,31 @@ test('checkout, new shifts, stale signals, inactive employees, and unlinked devi
 const transportUrl = moduleUrl(`
   export const state = { rows: {}, calls: [], cap: 500, errorTable: null, errorOffset: 0 };
   export const supabase = { from(table) {
-    const order = [];
+    const order = [], filters = [];
     const query = {
       select() { return query; },
+      eq(column, value) { filters.push([column, value]); return query; },
       order(column) { order.push(column); return query; },
       async range(start, end) {
-        state.calls.push({ table, start, end, order: [...order] });
+        state.calls.push({ table, start, end, order: [...order], filters: [...filters] });
         if (table === state.errorTable && start >= state.errorOffset) {
           return { data: null, error: new Error('Read denied') };
         }
-        return { data: (state.rows[table] ?? []).slice(start, Math.min(end + 1, start + state.cap)), error: null };
+        const rows = (state.rows[table] ?? []).filter((row) => filters.every(([column, value]) => (row[column] ?? 'org-1') === value));
+        return { data: rows.slice(start, Math.min(end + 1, start + state.cap)), error: null };
       },
     };
     return query;
   } };
 `)
 const { state } = await import(transportUrl)
+const scopeUrl = moduleUrl(compile('../src/api/organizationScope.ts'))
+const { setCurrentOrganizationId } = await import(scopeUrl)
+setCurrentOrganizationId('org-1')
 const { fetchSiteWorkerDirectory } = await import(moduleUrl(
-  compile('../src/api/siteWorkers.ts').replace("'./supabase'", JSON.stringify(transportUrl)),
+  compile('../src/api/siteWorkers.ts')
+    .replace("'./supabase'", JSON.stringify(transportUrl))
+    .replace("'./organizationScope'", JSON.stringify(scopeUrl)),
 ))
 
 test('fetches complete rosters beyond the Supabase row cap with stable page ordering', async () => {
@@ -121,6 +128,20 @@ test('fetches complete rosters beyond the Supabase row cap with stable page orde
   assert.deepEqual(state.calls.filter((call) => call.table === 'employee_sites').map((call) => call.start), [0, 500, 1000, 1500, 1501])
   assert.ok(state.calls.every((call) => call.order.length > 0))
   assert.deepEqual(state.calls.find((call) => call.table === 'employee_sites').order, ['employee_id', 'site_id'])
+})
+
+test('the roster contains only the selected organization', async () => {
+  state.rows = {
+    employees: [{ id: 1 }, { id: 2, organization_id: 'org-2' }],
+    sites: [{ id: 'a' }, { id: 'b', organization_id: 'org-2' }],
+    employee_sites: [{ employee_id: 1, site_id: 'a' }, { employee_id: 2, site_id: 'b', organization_id: 'org-2' }],
+  }
+  state.calls = []
+  const directory = await fetchSiteWorkerDirectory()
+  assert.deepEqual(directory.employees.map((employee) => employee.id), [1])
+  assert.deepEqual(directory.sites.map((site) => site.id), ['a'])
+  assert.equal(directory.assignments.length, 1)
+  assert.ok(state.calls.every((call) => call.filters.some(([column, value]) => column === 'organization_id' && value === 'org-1')))
 })
 
 test('continues reading when Supabase enforces a smaller row cap than requested', async () => {

@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { currentOrganizationId } from './organizationScope'
 import { recentActivityEvents, type ActivityLocation, type ActivitySession } from '../lib/recentActivity'
 
 export interface RecentActivitySnapshot {
@@ -7,13 +8,14 @@ export interface RecentActivitySnapshot {
 }
 
 export async function fetchRecentActivity(): Promise<RecentActivitySnapshot> {
+  const organizationId = currentOrganizationId()
   // Query entry and exit independently: ordering only by check-in hides a
   // recent checkout from an older shift. Five of each cover a five-event feed.
   const [entries, checkouts] = await Promise.all([
     supabase.from('presence_sessions').select('id,user_id,site_id,entry_timestamp,exit_timestamp')
-      .order('entry_timestamp', { ascending: false }).order('id', { ascending: false }).limit(5),
+      .eq('organization_id', organizationId).order('entry_timestamp', { ascending: false }).order('id', { ascending: false }).limit(5),
     supabase.from('presence_sessions').select('id,user_id,site_id,entry_timestamp,exit_timestamp')
-      .not('exit_timestamp', 'is', null)
+      .eq('organization_id', organizationId).not('exit_timestamp', 'is', null)
       .order('exit_timestamp', { ascending: false }).order('id', { ascending: false }).limit(5),
   ])
   if (entries.error) throw entries.error
@@ -26,7 +28,7 @@ export async function fetchRecentActivity(): Promise<RecentActivitySnapshot> {
   // affect the five newest events, including every page in that interval.
   for (let offset = 0; ; ) {
     let query = supabase.from('location_logs').select('id,user_id,site_id,timestamp,is_inside')
-      .order('timestamp', { ascending: false }).order('id', { ascending: false })
+      .eq('organization_id', organizationId).order('timestamp', { ascending: false }).order('id', { ascending: false })
     if (cutoff) query = query.gte('timestamp', cutoff)
     const { data, error } = await query.range(offset, offset + 499)
     if (error) throw error
@@ -43,7 +45,7 @@ export async function fetchRecentActivity(): Promise<RecentActivitySnapshot> {
     for (let offset = 0; offset < keys.length; offset += 10) {
       const previous = await Promise.all(keys.slice(offset, offset + 10).map(async (location) => {
         const { data, error } = await supabase.from('location_logs').select('id,user_id,site_id,timestamp,is_inside')
-          .eq('user_id', location.user_id).eq('site_id', location.site_id!)
+          .eq('organization_id', organizationId).eq('user_id', location.user_id).eq('site_id', location.site_id!)
           .lt('timestamp', cutoff).order('timestamp', { ascending: false }).order('id', { ascending: false }).limit(1)
         if (error) throw error
         return data

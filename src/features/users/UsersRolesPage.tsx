@@ -1,8 +1,13 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { fetchEmployeeSites, fetchEmployees } from '@/api/services'
+import { fetchEmployeeAccountCandidates, linkEmployeeAccount } from '@/api/organizations'
 import { useAuth } from '@/api/AuthProvider'
+import { useOrganization } from '@/api/OrganizationProvider'
+import { roleLabels } from '@/lib/consoleAccess'
+import { useToast } from '@/components/ui/toast'
+import { ConsoleTeamPanel } from './ConsoleTeamPanel'
 import { PageHeader } from '@/components/ui/page-header'
 import { StatCard } from '@/components/ui/stat-card'
 import { Badge } from '@/components/ui/badge'
@@ -26,29 +31,78 @@ import { cn } from '@/lib/utils'
 
 type AccountFilter = 'all' | 'linked' | 'unlinked' | 'active'
 
-const consolePermissions = [
-  'Open the manager console',
-  'Manage employees and assignments',
-  'Create and edit sites and geofences',
-  'Review attendance and location history',
-  'Export reports and audit logs',
-  'Manage authentication roles',
-]
-
-const fieldPermissions = [
-  'Sign in to the Crewtraxa mobile app',
-  'Send GPS pings while checked in',
-  'Create automatic entry and exit sessions',
-  'View their own attendance history',
-]
+const accessModel = [
+  {
+    role: roleLabels.org_admin,
+    surface: 'Console',
+    variant: 'success',
+    tick: 'text-emerald-500',
+    permissions: ['Everything a manager can do', 'Grant and remove Console roles', 'Edit organization settings'],
+  },
+  {
+    role: roleLabels.manager,
+    surface: 'Console',
+    variant: 'info',
+    tick: 'text-sky-500',
+    permissions: [
+      'Manage employees, sites, shifts and assignments',
+      'Invite employees and review devices',
+      'Review attendance, history, reports and audit logs',
+    ],
+  },
+  {
+    role: roleLabels.supervisor,
+    surface: 'Console',
+    variant: 'secondary',
+    tick: 'text-slate-400',
+    permissions: ['View live tracking, rosters, attendance and reports', 'Cannot change records'],
+  },
+  {
+    role: 'Employee',
+    surface: 'Crewtraxa Employee app',
+    variant: 'outline',
+    tick: 'text-sky-500',
+    permissions: [
+      'Sign in to the Crewtraxa Employee app',
+      'Send GPS pings while checked in',
+      'Check in and out of assigned sites',
+      'View their own attendance history',
+    ],
+  },
+] as const
 
 export function UsersRolesPage() {
-  const { user, role } = useAuth()
+  const { user } = useAuth()
+  const { role, canManage, isPlatformAdmin } = useOrganization()
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
   const [filter, setFilter] = useState<AccountFilter>('all')
   const [search, setSearch] = useState('')
 
   const employeesQuery = useQuery({ queryKey: ['employees'], queryFn: fetchEmployees })
   const assignmentsQuery = useQuery({ queryKey: ['employee-sites'], queryFn: () => fetchEmployeeSites() })
+  const candidatesQuery = useQuery({
+    queryKey: ['employee-account-candidates'],
+    queryFn: fetchEmployeeAccountCandidates,
+    enabled: isPlatformAdmin,
+  })
+  // Employees accept their invitation in the app. Only platform admins can link an account
+  // directly; an organization must never attach someone else's account to itself.
+  const linkAccount = useMutation({
+    mutationFn: (employee: { id: string; name: string }) => linkEmployeeAccount(employee.id),
+    onSuccess: async (_, employee) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['employees'] }),
+        queryClient.invalidateQueries({ queryKey: ['employee-account-candidates'] }),
+      ])
+      toast({ title: 'Account linked', description: `${employee.name} can now send attendance from the app.` })
+    },
+    onError: (error) => toast({ title: 'Account not linked', description: error.message, variant: 'error' }),
+  })
+  const candidateByEmployee = useMemo(
+    () => new Map((candidatesQuery.data ?? []).map((candidate) => [candidate.employee_id, candidate])),
+    [candidatesQuery.data]
+  )
 
   const employees = employeesQuery.data ?? []
   const assignments = assignmentsQuery.data ?? []
@@ -142,16 +196,16 @@ export function UsersRolesPage() {
           tone="sky"
         />
         <StatCard
-          label="Not linked"
+          label="Invitations pending"
           value={unlinked.length}
-          hint="Cannot send location or attendance data"
+          hint="Accepted when the employee signs in to the app"
           icon={UserX}
           tone={unlinked.length > 0 ? 'amber' : 'emerald'}
         />
         <StatCard
-          label="Console managers"
-          value={role === 'manager' ? 1 : 0}
-          hint="Manager role is assigned in Supabase Auth"
+          label="Your Console role"
+          value={role ? roleLabels[role] : 'Unknown'}
+          hint="Enforced by database row-level security"
           icon={ShieldCheck}
           tone="emerald"
         />
@@ -256,9 +310,13 @@ export function UsersRolesPage() {
                             <>
                               <Link2 className="h-3 w-3 text-emerald-500" /> App account linked
                             </>
+                          ) : candidateByEmployee.has(employee.id) ? (
+                            <>
+                              <ShieldCheck className="h-3 w-3 text-sky-500" /> Confirmed account found
+                            </>
                           ) : (
                             <>
-                              <UserX className="h-3 w-3 text-amber-500" /> No app account
+                              <UserX className="h-3 w-3 text-amber-500" /> Invitation pending
                             </>
                           )}
                         </span>
@@ -282,6 +340,23 @@ export function UsersRolesPage() {
                         </Badge>
                       </td>
                       <td className="px-4 py-3 text-right">
+                        {isPlatformAdmin && !employee.user_id && candidateByEmployee.has(employee.id) && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="mr-2 h-7 gap-1 px-2 text-[11px]"
+                            disabled={linkAccount.isPending}
+                            title={`Link to ${candidateByEmployee.get(employee.id)!.email}`}
+                            onClick={() => {
+                              const name = `${employee.first_name} ${employee.last_name}`.trim()
+                              if (confirm(`Link ${name} to the confirmed account ${candidateByEmployee.get(employee.id)!.email}?`)) {
+                                linkAccount.mutate({ id: employee.id, name })
+                              }
+                            }}
+                          >
+                            <Link2 className="h-3 w-3" /> Link account
+                          </Button>
+                        )}
                         <Link
                           to={`/employees?q=${encodeURIComponent(employee.email)}`}
                           className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
@@ -304,12 +379,14 @@ export function UsersRolesPage() {
           </div>
 
           <div className="border-t border-border/70 px-4 py-2.5 text-[10px] text-muted-foreground">
-            Account linkage comes from the employee record&apos;s Supabase user ID. New auth users
-            are managed in Supabase. Users can reset their password from the sign-in page.
+            An employee profile is an invitation. The employee accepts it by signing in to the Crewtraxa
+            Employee app with the same confirmed email; only platform admins can link an account directly.
           </div>
         </section>
 
         <aside className="space-y-4">
+          {canManage && <ConsoleTeamPanel />}
+
           <div className="surface-panel p-4">
             <div className="flex items-start justify-between gap-2">
               <div>
@@ -328,7 +405,7 @@ export function UsersRolesPage() {
               <div className="flex items-center justify-between gap-2">
                 <span className="text-muted-foreground">Console role</span>
                 <Badge variant="success" dot>
-                  {role ?? 'Unknown'}
+                  {role ? roleLabels[role] : 'Unknown'}
                 </Badge>
               </div>
               <div className="flex items-center justify-between gap-2">
@@ -351,37 +428,24 @@ export function UsersRolesPage() {
               <ShieldCheck className="h-4 w-4 text-primary" /> Access model
             </h2>
             <p className="mt-1 text-[11px] text-muted-foreground">
-              Console access is restricted to the <span className="font-medium text-foreground">manager</span>{' '}
-              role in Supabase Auth.
+              Every role is scoped to this organization and enforced by database row-level security.
             </p>
-            <div className="mt-3 rounded-lg border border-border/70 bg-muted/25 p-3">
-              <div className="mb-2 flex items-center gap-2">
-                <Badge variant="success">Manager</Badge>
-                <span className="text-[10px] text-muted-foreground">Console</span>
+            {accessModel.map((entry) => (
+              <div key={entry.role} className="mt-2 rounded-lg border border-border/70 bg-muted/25 p-3 first-of-type:mt-3">
+                <div className="mb-2 flex items-center gap-2">
+                  <Badge variant={entry.variant}>{entry.role}</Badge>
+                  <span className="text-[10px] text-muted-foreground">{entry.surface}</span>
+                </div>
+                <ul className="space-y-1.5">
+                  {entry.permissions.map((permission) => (
+                    <li key={permission} className="flex items-start gap-2 text-[11px] text-muted-foreground">
+                      <Check className={cn('mt-0.5 h-3 w-3 shrink-0', entry.tick)} />
+                      {permission}
+                    </li>
+                  ))}
+                </ul>
               </div>
-              <ul className="space-y-1.5">
-                {consolePermissions.map((permission) => (
-                  <li key={permission} className="flex items-start gap-2 text-[11px] text-muted-foreground">
-                    <Check className="mt-0.5 h-3 w-3 shrink-0 text-emerald-500" />
-                    {permission}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="mt-2 rounded-lg border border-border/70 bg-muted/25 p-3">
-              <div className="mb-2 flex items-center gap-2">
-                <Badge variant="info">Employee</Badge>
-                <span className="text-[10px] text-muted-foreground">Mobile app</span>
-              </div>
-              <ul className="space-y-1.5">
-                {fieldPermissions.map((permission) => (
-                  <li key={permission} className="flex items-start gap-2 text-[11px] text-muted-foreground">
-                    <Check className="mt-0.5 h-3 w-3 shrink-0 text-sky-500" />
-                    {permission}
-                  </li>
-                ))}
-              </ul>
-            </div>
+            ))}
           </div>
         </aside>
       </div>
@@ -389,8 +453,8 @@ export function UsersRolesPage() {
       <div className="flex flex-col gap-2 rounded-xl border border-border/70 bg-muted/30 px-4 py-3 text-[11px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <p className="flex items-start gap-2">
           <UserCog className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
-          Role assignment and invitations are handled in Supabase Auth. This console does not modify
-          authentication records.
+          Organization admins grant Console roles here. Sign-in accounts and invitations are still
+          created in Supabase Auth; this Console never edits authentication records.
         </p>
         <Link to="/audit" className="inline-flex shrink-0 items-center gap-1 font-medium text-primary hover:underline">
           Review audit trail <ArrowRight className="h-3 w-3" />

@@ -11,8 +11,6 @@ interface AuthContextType {
   isPasswordRecovery: boolean
   signIn: (email: string, password: string) => Promise<Session | null>
   signOut: () => Promise<void>
-  isManager: boolean
-  role: string | null
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -33,8 +31,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => new URLSearchParams(window.location.hash.slice(1)).get('type') === 'recovery'
   )
 
-  const role = user?.user_metadata?.role?.toString() ?? null
-  const isManager = role === 'manager'
+  // Console roles come from organization membership (see OrganizationProvider), not
+  // user_metadata, which every signed-in user can edit.
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -73,7 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ session, user, loading, isPasswordRecovery, signIn, signOut, isManager, role }}
+      value={{ session, user, loading, isPasswordRecovery, signIn, signOut }}
     >
       {children}
     </AuthContext.Provider>
