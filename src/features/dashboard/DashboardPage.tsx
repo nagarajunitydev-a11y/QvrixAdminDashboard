@@ -4,12 +4,13 @@ import { useQuery } from '@tanstack/react-query'
 import {
   fetchSites,
   fetchEmployees,
-  fetchActivePresenceSessions,
-  fetchLocationLogs,
 } from '@/api/services'
+import { fetchRecentActivity } from '@/api/recentActivity'
+import { recentActivityEvents } from '@/lib/recentActivity'
+import { employeeNamesByUserId } from '@/lib/employeeIdentity'
 import { Badge } from '@/components/ui/badge'
 import { PageHeader } from '@/components/ui/page-header'
-import { PageSkeleton } from '@/components/ui/states'
+import { ErrorState, PageSkeleton } from '@/components/ui/states'
 import { StatCard } from '@/components/ui/stat-card'
 import { Button } from '@/components/ui/button'
 import {
@@ -25,7 +26,7 @@ import {
   Clock3,
 } from 'lucide-react'
 import type { EmployeeWithRelations } from '@/api/services'
-import { deriveWorkforceCounts } from '@/lib/workforce'
+import { useWorkforceTracking } from '@/api/useWorkforceTracking'
 
 function initials(first?: string | null, last?: string | null) {
   return `${first?.[0] ?? 'E'}${last?.[0] ?? ''}`.toUpperCase()
@@ -68,40 +69,45 @@ function exportEmployeesCsv(employees: EmployeeWithRelations[]) {
 }
 
 export function DashboardPage() {
-  const { data: sites = [], isLoading: sitesLoading } = useQuery({
+  const sitesQuery = useQuery({
     queryKey: ['sites'],
     queryFn: fetchSites,
+    refetchInterval: 15_000,
   })
-  const { data: employees = [], isLoading: employeesLoading } = useQuery({
+  const employeesQuery = useQuery({
     queryKey: ['employees'],
     queryFn: fetchEmployees,
+    refetchInterval: 15_000,
   })
-  const { data: activeSessions = [] } = useQuery({
-    queryKey: ['active-presence-sessions'],
-    queryFn: fetchActivePresenceSessions,
-  })
-  const { data: recentLogs = [] } = useQuery({
-    queryKey: ['recent-location-logs'],
-    queryFn: () => fetchLocationLogs({ limit: 12 }),
-  })
-
-  const stats = useMemo(
-    () => deriveWorkforceCounts(employees, activeSessions),
-    [employees, activeSessions]
+  const sites = useMemo(() => sitesQuery.data ?? [], [sitesQuery.data])
+  const employees = useMemo(() => employeesQuery.data ?? [], [employeesQuery.data])
+  const { counts: stats, snapshotQuery, assignmentsQuery } = useWorkforceTracking(
+    employees, sites, employeesQuery.isSuccess && sitesQuery.isSuccess,
   )
+  const activityQuery = useQuery({
+    queryKey: ['recent-entry-exit-activity'],
+    queryFn: fetchRecentActivity,
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: true,
+  })
+  const recentActivity = useMemo(() => recentActivityEvents(
+    [...(activityQuery.data?.sessions ?? []), ...(snapshotQuery.data?.sessions ?? [])],
+    activityQuery.data?.locations ?? [],
+  ), [activityQuery.data, snapshotQuery.data])
 
   const alerts = useMemo(
-    () => recentLogs.filter((log) => !log.is_inside).slice(0, 4),
-    [recentLogs]
+    () => [...stats.employeeStates.values()]
+      .filter((state) => state.status === 'outside' && state.latest && state.site)
+      .map((state) => ({
+        ...state.latest!,
+        site_id: state.site!.id,
+        distance_to_site: state.distanceToSite,
+      }))
+      .sort((a, b) => b.timestamp - a.timestamp).slice(0, 4),
+    [stats]
   )
 
-  const employeeNameById = useMemo(() => {
-    const map = new Map<string, string>()
-    employees.forEach((e) => {
-      if (e.user_id) map.set(e.user_id, `${e.first_name} ${e.last_name}`)
-    })
-    return map
-  }, [employees])
+  const employeeNameById = useMemo(() => employeeNamesByUserId(employees), [employees])
 
   const siteNameById = useMemo(() => {
     const map = new Map<string, string>()
@@ -111,20 +117,31 @@ export function DashboardPage() {
 
   const siteOccupancy = useMemo(() => {
     const assignedBySite = new Map<string, number>()
-    // Occupancy derived from active sessions grouped by site
+    // Use the same confirmed on-site states as the workforce count.
     const insideBySite = new Map<string, number>()
-    activeSessions.forEach((s) => {
-      if (s.site_id) insideBySite.set(s.site_id, (insideBySite.get(s.site_id) ?? 0) + 1)
+    stats.employeeStates.forEach((state) => {
+      if (state.status === 'on-site' && state.site) {
+        insideBySite.set(state.site.id, (insideBySite.get(state.site.id) ?? 0) + 1)
+      }
     })
     return sites.map((site) => ({
       site,
       inside: insideBySite.get(site.id) ?? 0,
       assigned: assignedBySite.get(site.id) ?? null,
     }))
-  }, [sites, activeSessions])
+  }, [sites, stats])
 
-  if (sitesLoading && employeesLoading) {
+  if (sitesQuery.isLoading || employeesQuery.isLoading || snapshotQuery.isLoading || assignmentsQuery.isLoading) {
     return <PageSkeleton cards={4} rows={5} />
+  }
+
+  if (sitesQuery.isError || employeesQuery.isError || snapshotQuery.isError || assignmentsQuery.isError) {
+    return <ErrorState description="Workforce status could not be loaded from Supabase." onRetry={() => {
+      void sitesQuery.refetch()
+      void employeesQuery.refetch()
+      void snapshotQuery.refetch()
+      void assignmentsQuery.refetch()
+    }} />
   }
 
   return (
@@ -343,7 +360,13 @@ export function DashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border font-body text-body-sm">
-                {recentLogs.slice(0, 5).map((log) => (
+                {activityQuery.isError && (
+                  <tr><td colSpan={4} className="px-4 py-3"><ErrorState title="Activity updates unavailable" description="Recent entry, exit and checkout activity could not be refreshed." onRetry={() => { void activityQuery.refetch() }} /></td></tr>
+                )}
+                {activityQuery.isPending && (
+                  <tr><td colSpan={4} className="px-4 py-10 text-center text-body-sm text-muted-foreground" role="status">Loading recent activity...</td></tr>
+                )}
+                {activityQuery.data && recentActivity.map((log) => (
                   <tr key={log.id} className="row-hover transition-colors">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
@@ -354,7 +377,7 @@ export function DashboardPage() {
                           )}
                         </div>
                         <span className="text-foreground">
-                          {employeeNameById.get(log.user_id ?? '') ?? 'Unknown device'}
+                          {employeeNameById.get(log.user_id) ?? 'Employee unavailable'}
                         </span>
                       </div>
                     </td>
@@ -365,13 +388,13 @@ export function DashboardPage() {
                       {timeAgo(log.timestamp)}
                     </td>
                     <td className="px-4 py-3">
-                      <Badge variant={log.is_inside ? 'success' : 'warning'} dot>
-                        {log.is_inside ? 'Entry' : 'Exit'}
+                      <Badge variant={log.status === 'Entry' ? 'success' : 'warning'} dot>
+                        {log.status}
                       </Badge>
                     </td>
                   </tr>
                 ))}
-                {recentLogs.length === 0 && (
+                {activityQuery.isSuccess && recentActivity.length === 0 && (
                   <tr>
                     <td colSpan={4} className="px-4 py-10 text-center text-body-sm text-muted-foreground">
                       No activity recorded yet.

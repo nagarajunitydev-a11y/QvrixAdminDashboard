@@ -16,6 +16,7 @@ import { DepartmentsPage } from './features/departments/DepartmentsPage'
 import { DesignationsPage } from './features/designations/DesignationsPage'
 import { ShiftsPage } from './features/shifts/ShiftsPage'
 import { SitesPage } from './features/sites/SitesPage'
+import { SiteWorkersPage } from './features/site-workers/SiteWorkersPage'
 import { LocationLogsPage } from './features/location-logs/LocationLogsPage'
 import { PresenceSessionsPage } from './features/presence/PresenceSessionsPage'
 import { AssignmentsPage } from './features/employee-sites/AssignmentsPage'
@@ -45,6 +46,7 @@ function App() {
                     <Route path="/designations" element={<DesignationsPage />} />
                     <Route path="/shifts" element={<ShiftsPage />} />
                     <Route path="/sites" element={<SitesPage />} />
+                    <Route path="/site-workers" element={<SiteWorkersPage />} />
                     <Route path="/attendance" element={<PresenceSessionsPage />} />
                     <Route path="/presence" element={<PresenceSessionsPage />} />
                     <Route path="/history" element={<LocationLogsPage />} />

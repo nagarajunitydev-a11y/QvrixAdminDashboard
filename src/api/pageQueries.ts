@@ -9,13 +9,14 @@
  * `['employee-sites', employeeId]` and `['location-logs', { ...filters }]`.
  */
 export const PAGE_QUERY_KEYS: Record<string, string[]> = {
-  '/': ['sites', 'employees', 'active-presence-sessions', 'recent-location-logs'],
-  '/live-tracking': ['employees', 'sites', 'active-presence-sessions', 'live-location-logs'],
+  '/': ['sites', 'employees', 'workforce-tracking', 'employee-sites', 'recent-entry-exit-activity'],
+  '/live-tracking': ['employees', 'sites', 'workforce-tracking', 'employee-sites'],
   '/employees': ['employees', 'departments', 'designations', 'shifts', 'sites', 'employee-sites'],
   '/departments': ['departments'],
   '/designations': ['designations'],
   '/shifts': ['shifts', 'departments'],
   '/sites': ['sites', 'employees', 'employee-sites'],
+  '/site-workers': ['site-workers', 'workforce-tracking'],
   '/location-logs': ['location-logs', 'sites', 'employees'],
   '/history': ['location-logs', 'sites', 'employees'],
   '/presence': ['presence-sessions', 'sites', 'employees'],

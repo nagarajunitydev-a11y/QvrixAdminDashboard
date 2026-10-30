@@ -1,8 +1,8 @@
 import { supabase } from './supabase'
+import { mutationError } from './mutationErrors'
 import type {
   Site,
   SiteInsert,
-  SiteUpdate,
   LocationLog,
   PresenceSession,
   Department,
@@ -38,6 +38,14 @@ export type EmployeeSiteWithSite = EmployeeSite & {
 
 const from = (table: string) => supabase.from(table)
 
+async function deleteRecord(table: string, id: string, label: string): Promise<void> {
+  const { data, error } = await from(table).delete().eq('id', id).select('id')
+  if (error) throw mutationError(error, `delete this ${label}`)
+  if (!data?.length) {
+    throw new Error(`The ${label} was not deleted. It may have already been removed, or your account does not have permission to delete it. Refresh to check the current record.`)
+  }
+}
+
 // Sites
 export async function fetchSites(): Promise<Site[]> {
   const { data, error } = await from('sites').select('*')
@@ -47,23 +55,57 @@ export async function fetchSites(): Promise<Site[]> {
 
 export async function createSite(payload: SiteInsert): Promise<Site> {
   const { data, error } = await from('sites').insert(payload).select().single()
-  if (error) throw error
+  if (error) throw mutationError(error, 'create this site')
   return data
 }
 
-export async function updateSite(id: string, payload: SiteUpdate): Promise<Site> {
+type SiteFields = Pick<Site, 'name' | 'latitude' | 'longitude' | 'radius_in_meters'>
+
+export async function updateSite(id: string, payload: SiteFields, original: Site): Promise<Site> {
+  if (id !== original.id) throw new Error('The selected site does not match the record being edited. Reopen the site before saving.')
+  // Compare the values read when editing began: updated_at has no update trigger.
   const { data, error } = await from('sites')
-    .update(payload)
+    .update({
+      name: payload.name,
+      latitude: payload.latitude,
+      longitude: payload.longitude,
+      radius_in_meters: payload.radius_in_meters,
+    })
     .eq('id', id)
+    .eq('name', original.name)
+    .eq('latitude', original.latitude)
+    .eq('longitude', original.longitude)
+    .eq('radius_in_meters', original.radius_in_meters)
     .select()
-    .single()
-  if (error) throw error
+    .maybeSingle()
+  if (error) throw mutationError(error, 'update this site')
+  if (!data) {
+    throw new Error('This site changed, was removed, or you no longer have permission to edit it. Refresh and reopen the site before saving. Your changes have not been applied.')
+  }
   return data
+}
+
+async function fetchSiteDeleteBlockers(id: string): Promise<string[]> {
+  const references = [
+    ['employee_sites', 'employee assignments'],
+    ['location_logs', 'location history'],
+    ['presence_sessions', 'attendance sessions'],
+    ['site_visits', 'site visits'],
+  ] as const
+  return (await Promise.all(references.map(async ([table, label]) => {
+    const { count, error } = await from(table).select('*', { count: 'exact', head: true }).eq('site_id', id)
+    if (error) throw mutationError(error, 'check whether this site can be deleted')
+    return count ? label : null
+  }))).filter((label): label is NonNullable<typeof label> => label !== null)
 }
 
 export async function deleteSite(id: string): Promise<void> {
-  const { error } = await from('sites').delete().eq('id', id)
-  if (error) throw error
+  const blockers = await fetchSiteDeleteBlockers(id)
+  if (blockers.length) {
+    throw new Error(`This site cannot be deleted because it is linked to ${blockers.join(', ')}. Keep the site to preserve its history and links. Employee assignments can be reviewed in the site panel.`)
+  }
+  // The foreign keys remain authoritative if a new reference appears after the check.
+  await deleteRecord('sites', id, 'site')
 }
 
 // Location Logs
@@ -133,8 +175,7 @@ export async function updateDepartment(id: string, payload: DepartmentUpdate): P
 }
 
 export async function deleteDepartment(id: string): Promise<void> {
-  const { error } = await from('departments').delete().eq('id', id)
-  if (error) throw error
+  await deleteRecord('departments', id, 'department')
 }
 
 // Designations
@@ -161,8 +202,7 @@ export async function updateDesignation(id: string, payload: DesignationUpdate):
 }
 
 export async function deleteDesignation(id: string): Promise<void> {
-  const { error } = await from('designations').delete().eq('id', id)
-  if (error) throw error
+  await deleteRecord('designations', id, 'designation')
 }
 
 // Shifts
@@ -191,8 +231,7 @@ export async function updateShift(id: string, payload: ShiftUpdate): Promise<Shi
 }
 
 export async function deleteShift(id: string): Promise<void> {
-  const { error } = await from('shifts').delete().eq('id', id)
-  if (error) throw error
+  await deleteRecord('shifts', id, 'shift')
 }
 
 // Employees
@@ -230,8 +269,7 @@ export async function updateEmployee(id: string, payload: EmployeeUpdate): Promi
 }
 
 export async function deleteEmployee(id: string): Promise<void> {
-  const { error } = await from('employees').delete().eq('id', id)
-  if (error) throw error
+  await deleteRecord('employees', id, 'employee')
 }
 
 // Employee-Sites

@@ -2,9 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  fetchActivePresenceSessions,
   fetchEmployees,
-  fetchLocationLogs,
   fetchSites,
   type EmployeeWithRelations,
 } from '@/api/services'
@@ -19,11 +17,14 @@ import { MapCanvas, type MapCircle, type MapMarker } from '@/components/map/MapC
 import { centroidOf, formatRadius, type LatLng } from '@/lib/geo'
 import { initialsFromName, isRecent, timeAgo } from '@/lib/format'
 import {
-  deriveWorkforceCounts,
+  classifyTracking,
+  getLatestLocationByUser,
   getLatestSessionByUser,
+  hasValidCoordinates,
   isLocationFresh,
-  getSessionStatus,
+  type TrackStatus,
 } from '@/lib/workforce'
+import { useWorkforceTracking } from '@/api/useWorkforceTracking'
 import {
   Activity,
   ArrowRight,
@@ -43,8 +44,6 @@ import { cn } from '@/lib/utils'
 
 const DEFAULT_CENTER: LatLng = { lat: 20.5937, lng: 78.9629 }
 
-type TrackStatus = 'on-site' | 'outside' | 'recent' | 'offline' | 'checked-out'
-
 type TrackedMember = {
   id: string
   employee: EmployeeWithRelations | null
@@ -54,6 +53,7 @@ type TrackedMember = {
   session: PresenceSession | null
   status: TrackStatus
   position: LatLng | null
+  distanceToSite: number | null
 }
 
 const statusMeta: Record<
@@ -80,7 +80,9 @@ function positionOf(
   session: PresenceSession | null,
   siteById: Map<string, { latitude: number; longitude: number }>
 ): LatLng | null {
-  if (latest) return { lat: latest.latitude, lng: latest.longitude }
+  if (latest && hasValidCoordinates(latest.latitude, latest.longitude)) {
+    return { lat: latest.latitude, lng: latest.longitude }
+  }
   const site = session ? siteById.get(session.site_id) : null
   return site ? { lat: site.latitude, lng: site.longitude } : null
 }
@@ -93,31 +95,19 @@ export function LiveTrackingPage() {
   const [mapCenter, setMapCenter] = useState<LatLng>(DEFAULT_CENTER)
   const centeredRef = useRef(false)
 
-  const employeesQuery = useQuery({ queryKey: ['employees'], queryFn: fetchEmployees })
-  const sitesQuery = useQuery({ queryKey: ['sites'], queryFn: fetchSites })
-  const sessionsQuery = useQuery({
-    queryKey: ['active-presence-sessions'],
-    queryFn: fetchActivePresenceSessions,
-    refetchInterval: 15_000,
-  })
-  const logsQuery = useQuery({
-    queryKey: ['live-location-logs'],
-    queryFn: () => fetchLocationLogs({ limit: 300 }),
-    refetchInterval: 15_000,
-  })
+  const employeesQuery = useQuery({ queryKey: ['employees'], queryFn: fetchEmployees, refetchInterval: 15_000 })
+  const sitesQuery = useQuery({ queryKey: ['sites'], queryFn: fetchSites, refetchInterval: 15_000 })
+  const employees = useMemo(() => employeesQuery.data ?? [], [employeesQuery.data])
+  const sites = useMemo(() => sitesQuery.data ?? [], [sitesQuery.data])
+  const { counts, snapshotQuery, assignmentsQuery, now } = useWorkforceTracking(
+    employees, sites, employeesQuery.isSuccess && sitesQuery.isSuccess,
+  )
+  const sessions = useMemo(() => snapshotQuery.data?.sessions ?? [], [snapshotQuery.data])
 
-  const employees = employeesQuery.data ?? []
-  const sites = sitesQuery.data ?? []
-  const sessions = sessionsQuery.data ?? []
-  const logs = logsQuery.data ?? []
-
-  const latestByUser = useMemo(() => {
-    const map = new Map<string, LocationLog>()
-    logs.forEach((log) => {
-      if (!map.has(log.user_id)) map.set(log.user_id, log)
-    })
-    return map
-  }, [logs])
+  const latestByUser = useMemo(
+    () => getLatestLocationByUser(snapshotQuery.data?.locations ?? []),
+    [snapshotQuery.data],
+  )
 
   const sessionByUser = useMemo(() => getLatestSessionByUser(sessions), [sessions])
 
@@ -134,21 +124,7 @@ export function LiveTrackingPage() {
     )
 
     const employeeRows = employees.map((employee): TrackedMember => {
-      const latest = employee.user_id ? latestByUser.get(employee.user_id) ?? null : null
-      const session = employee.user_id ? sessionByUser.get(employee.user_id) ?? null : null
-      let status: TrackStatus = 'offline'
-      if (employee.user_id) {
-        const sessionStatus = getSessionStatus(session)
-        if (sessionStatus === 'online') status = 'on-site'
-        else if (sessionStatus === 'checked-out') status = 'checked-out'
-        else if (latest && isLocationFresh(latest.timestamp)) {
-          status = latest.is_inside ? 'recent' : 'outside'
-        } else if (sessionStatus === 'stale') {
-          status = 'outside'
-        } else {
-          status = 'offline'
-        }
-      }
+      const { latest, session, status, distanceToSite } = counts.employeeStates.get(employee.id)!
       return {
         id: employee.id,
         employee,
@@ -158,6 +134,7 @@ export function LiveTrackingPage() {
         session,
         status,
         position: positionOf(latest, session, siteById),
+        distanceToSite,
       }
     })
 
@@ -173,17 +150,9 @@ export function LiveTrackingPage() {
       .map((userId): TrackedMember => {
         const latest = latestByUser.get(userId) ?? null
         const session = sessionByUser.get(userId) ?? null
-        let status: TrackStatus = 'offline'
-        const sessionStatus = getSessionStatus(session)
-        if (sessionStatus === 'online') status = 'on-site'
-        else if (sessionStatus === 'checked-out') status = 'checked-out'
-        else if (latest && isLocationFresh(latest.timestamp)) {
-          status = latest.is_inside ? 'recent' : 'outside'
-        } else if (sessionStatus === 'stale') {
-          status = 'outside'
-        } else {
-          status = 'offline'
-        }
+        // Unlinked devices have no confirmed employee site assignment, so
+        // they cannot contribute an outside-employee status or count.
+        const { status, distanceToSite } = classifyTracking(latest, session, [], now)
         return {
           id: `session:${userId}`,
           employee: null,
@@ -193,16 +162,19 @@ export function LiveTrackingPage() {
           session,
           status,
           position: positionOf(latest, session, siteById),
+          distanceToSite,
         }
       })
       // Only show devices that have some recent activity
-      .filter((row) => row.status !== 'offline')
+      .filter((row) => row.status !== 'offline' && (
+        isLocationFresh(row.latest?.timestamp, now) ||
+        isLocationFresh(row.session?.exit_timestamp, now)
+      ))
 
     return [...employeeRows, ...deviceRows]
-  }, [employees, latestByUser, sessionByUser, sessions, siteById])
+  }, [employees, latestByUser, sessionByUser, sessions, siteById, counts, now])
 
   const stats = useMemo(() => {
-    const counts = deriveWorkforceCounts(employees, sessions)
     return {
       onSite: counts.insideCount,
       outside: counts.outsideCount,
@@ -210,7 +182,7 @@ export function LiveTrackingPage() {
       noDevice: counts.offlineCount,
       unlinkedActive: tracked.filter((row) => !row.employee).length,
     }
-  }, [employees, sessions, tracked])
+  }, [counts, tracked])
 
   const visible = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -218,7 +190,7 @@ export function LiveTrackingPage() {
       .filter((row) => {
         if (filter === 'no-signal') return row.status === 'offline'
         if (filter === 'outside') {
-          return row.status === 'outside' || row.status === 'recent'
+          return row.status === 'outside'
         }
         if (filter === 'checked-out') {
           return row.status === 'checked-out'
@@ -290,19 +262,19 @@ export function LiveTrackingPage() {
   const isLoading =
     employeesQuery.isLoading ||
     sitesQuery.isLoading ||
-    sessionsQuery.isLoading ||
-    logsQuery.isLoading
+    snapshotQuery.isLoading ||
+    assignmentsQuery.isLoading
   const isError =
-    employeesQuery.isError || sitesQuery.isError || sessionsQuery.isError || logsQuery.isError
+    employeesQuery.isError || sitesQuery.isError || snapshotQuery.isError || assignmentsQuery.isError
   const isFetching =
     employeesQuery.isFetching ||
     sitesQuery.isFetching ||
-    sessionsQuery.isFetching ||
-    logsQuery.isFetching
+    snapshotQuery.isFetching ||
+    assignmentsQuery.isFetching
 
   const refresh = () => {
-    queryClient.invalidateQueries({ queryKey: ['live-location-logs'] })
-    queryClient.invalidateQueries({ queryKey: ['active-presence-sessions'] })
+    queryClient.invalidateQueries({ queryKey: ['workforce-tracking'] })
+    queryClient.invalidateQueries({ queryKey: ['employee-sites'] })
     queryClient.invalidateQueries({ queryKey: ['sites'] })
     queryClient.invalidateQueries({ queryKey: ['employees'] })
   }
@@ -325,8 +297,8 @@ export function LiveTrackingPage() {
     )
   }
 
-  const lastUpdated = logsQuery.dataUpdatedAt
-    ? new Date(logsQuery.dataUpdatedAt).toLocaleTimeString(undefined, {
+  const lastUpdated = snapshotQuery.dataUpdatedAt
+    ? new Date(snapshotQuery.dataUpdatedAt).toLocaleTimeString(undefined, {
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit',
@@ -376,7 +348,7 @@ export function LiveTrackingPage() {
         <StatCard
           label="Outside site"
           value={stats.outside}
-          hint="Tracked employees without an active session"
+          hint="Tracked employees outside geofence (recent location)"
           icon={ShieldAlert}
           tone="red"
         />
@@ -593,14 +565,14 @@ export function LiveTrackingPage() {
                                     : `Last seen ${timeAgo(row.latest.timestamp)}`
                                   : 'No ping yet'}
                               </span>
-                              {row.latest?.distance_to_site != null && (
+                              {row.distanceToSite != null && (
                                 <span
                                   className={cn(
                                     'shrink-0 tabular-nums',
-                                    !row.latest.is_inside && 'text-red-600 dark:text-red-400'
+                                    row.status === 'outside' && 'text-red-600 dark:text-red-400'
                                   )}
                                 >
-                                  {Math.round(row.latest.distance_to_site)} m
+                                  {Math.round(row.distanceToSite)} m
                                 </span>
                               )}
                             </div>

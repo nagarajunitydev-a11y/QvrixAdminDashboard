@@ -55,3 +55,15 @@ export function formatArea(squareMeters: number) {
 export function circleArea(radiusMeters: number) {
   return Math.PI * radiusMeters * radiusMeters
 }
+
+// Web Mercator view (integer zoom) that keeps every point plus padding inside
+// a viewport of roughly `viewportPx` on its shorter side.
+export function fitView(points: LatLng[], paddingMeters = 0, viewportPx = 480) {
+  const center = centroidOf(points)
+  if (!center) return null
+  const extent = maxDistanceFrom(center, points) + paddingMeters
+  if (extent <= 0) return { center, zoom: 16 }
+  const metersPerPixel = extent / (viewportPx / 2)
+  const zoom = Math.floor(Math.log2((156_543.033_92 * Math.cos((center.lat * Math.PI) / 180)) / metersPerPixel))
+  return { center, zoom: Math.max(3, Math.min(18, zoom)) }
+}

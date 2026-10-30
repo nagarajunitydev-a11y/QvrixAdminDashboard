@@ -9,10 +9,11 @@ import {
   unassignEmployeeFromSite,
   updateSite,
 } from '@/api/services'
-import type { Site, SiteInsert, SiteUpdate } from '@/types'
+import type { Site } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
@@ -83,6 +84,7 @@ export function SitesPage() {
   const sites = sitesQuery.data ?? []
 
   const [selectedId, setSelectedId] = useState<Selection>(null)
+  const [originalSite, setOriginalSite] = useState<Site | null>(null)
   const [mapCenter, setMapCenter] = useState<LatLng>(DEFAULT_CENTER)
   const [filter, setFilter] = useState('')
   const [name, setName] = useState('')
@@ -93,6 +95,7 @@ export function SitesPage() {
   const [drawingBoundary, setDrawingBoundary] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Site | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [unassigning, setUnassigning] = useState<string | null>(null)
 
   const centeredRef = useRef(false)
@@ -154,16 +157,18 @@ export function SitesPage() {
   const mutation = useMutation({
     mutationFn: async () => {
       if (!canSave) throw new Error('Complete the site name, coordinates, and radius before saving.')
-      const payload: SiteInsert = {
+      const payload = {
         name: name.trim(),
         latitude: draftLat,
         longitude: draftLng,
         radius_in_meters: Math.round(draftRadius),
       }
-      if (selectedSite) {
-        await updateSite(selectedSite.id, payload as SiteUpdate)
-      } else {
+      if (selectedId === 'new') {
         await createSite(payload)
+      } else if (selectedId && originalSite?.id === selectedId) {
+        await updateSite(selectedId, payload, originalSite)
+      } else {
+        throw new Error('Reopen the site before saving. No new site has been created.')
       }
     },
     onSuccess: async () => {
@@ -187,18 +192,20 @@ export function SitesPage() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['sites'] })
       await queryClient.invalidateQueries({ queryKey: ['employee-sites'] })
-      toast({ title: 'Site deleted', description: 'Assignments for this site were removed.' })
+      toast({ title: 'Site deleted', description: 'The unused site was removed.' })
       if (deleteTarget?.id === selectedId) closePanel()
       setDeleteTarget(null)
+      setDeleteError(null)
     },
     onError: (err) => {
       const text = err instanceof Error ? err.message : 'Failed to delete the site.'
+      setDeleteError(text)
       toast({ title: 'Could not delete site', description: text, variant: 'error' })
-      setDeleteTarget(null)
     },
   })
 
   function openEdit(site: Site) {
+    setOriginalSite(site)
     setSelectedId(site.id)
     setName(site.name)
     setLatitude(formatCoordinate(site.latitude, 6))
@@ -211,6 +218,7 @@ export function SitesPage() {
   }
 
   function openCreate(seed?: LatLng) {
+    setOriginalSite(null)
     setSelectedId('new')
     setName('')
     setLatitude(seed ? formatCoordinate(seed.lat, 6) : '')
@@ -223,6 +231,7 @@ export function SitesPage() {
   }
 
   function closePanel() {
+    setOriginalSite(null)
     setSelectedId(null)
     setError(null)
     setBoundaryPoints([])
@@ -869,17 +878,31 @@ export function SitesPage() {
         </aside>
       </div>
 
-      <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+      <Dialog open={deleteTarget !== null} onOpenChange={(open) => {
+        if (!open && !deleteMutation.isPending) {
+          setDeleteTarget(null)
+          setDeleteError(null)
+        }
+      }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Delete this site?</DialogTitle>
             <DialogDescription>
-              {deleteTarget?.name} will be removed, along with its employee assignments. Historical
-              location and attendance records are not affected.
+              Only unused sites can be deleted. {deleteTarget?.name} will be kept if it has employee
+              assignments, location history, attendance sessions, or site visits. Related records
+              will not be removed.
             </DialogDescription>
           </DialogHeader>
+          {deleteError && (
+            <Alert variant="destructive">
+              <AlertDescription>{deleteError}</AlertDescription>
+            </Alert>
+          )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+            <Button variant="outline" disabled={deleteMutation.isPending} onClick={() => {
+              setDeleteTarget(null)
+              setDeleteError(null)
+            }}>
               Cancel
             </Button>
             <Button

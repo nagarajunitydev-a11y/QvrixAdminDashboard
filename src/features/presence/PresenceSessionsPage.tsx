@@ -10,7 +10,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { formatDistanceToNow } from 'date-fns'
 import { PageHeader } from '@/components/ui/page-header'
-import { PageSkeleton } from '@/components/ui/states'
+import { ErrorState, PageSkeleton } from '@/components/ui/states'
+import { employeeNamesByUserId } from '@/lib/employeeIdentity'
 import { MapPin, Users, Radar, Clock3, CalendarRange, CalendarCheck2 } from 'lucide-react'
 
 function initials(name: string) {
@@ -29,7 +30,7 @@ export function PresenceSessionsPage() {
   const [startDate, setStartDate] = useState<string>('')
   const [endDate, setEndDate] = useState<string>('')
 
-  const { data: sessions = [], isLoading } = useQuery({
+  const sessionsQuery = useQuery({
     queryKey: ['presence-sessions', { siteId: siteFilter, userId: employeeFilter, startDate, endDate }],
     queryFn: () => fetchPresenceSessions({
       siteId: siteFilter ?? undefined,
@@ -39,7 +40,9 @@ export function PresenceSessionsPage() {
     }),
   })
   const { data: sites = [] } = useQuery({ queryKey: ['sites'], queryFn: fetchSites })
-  const { data: employees = [] } = useQuery({ queryKey: ['employees'], queryFn: fetchEmployees })
+  const employeesQuery = useQuery({ queryKey: ['employees'], queryFn: fetchEmployees })
+  const sessions = useMemo(() => sessionsQuery.data ?? [], [sessionsQuery.data])
+  const employees = employeesQuery.data ?? []
 
   const summary = useMemo(() => {
     const active = sessions.filter((s) => !s.exit_timestamp).length
@@ -49,12 +52,19 @@ export function PresenceSessionsPage() {
     return { active, completed, avgHours }
   }, [sessions])
 
-  if (isLoading) {
+  if (sessionsQuery.isError || employeesQuery.isError) {
+    return <ErrorState title="Could not load attendance employees" description="Attendance records and employee names could not be loaded. Try again to refresh both." onRetry={() => {
+      void sessionsQuery.refetch()
+      void employeesQuery.refetch()
+    }} />
+  }
+
+  if (sessionsQuery.isPending || employeesQuery.isPending) {
     return <PageSkeleton cards={3} rows={6} />
   }
 
   const siteMap = new Map(sites.map((s) => [s.id, s.name]))
-  const employeeMap = new Map(employees.map((e) => [e.user_id, `${e.first_name} ${e.last_name}`]))
+  const employeeMap = employeeNamesByUserId(employees)
 
   return (
     <div className="page-shell">
@@ -129,9 +139,9 @@ export function PresenceSessionsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="">All employees</SelectItem>
-                {employees.filter((e): e is EmployeeWithRelations & { user_id: string } => e.user_id !== null).map((e) => (
+                {employees.filter((e): e is EmployeeWithRelations & { user_id: string } => e.user_id !== null && employeeMap.has(e.user_id)).map((e) => (
                   <SelectItem key={e.user_id} value={e.user_id}>
-                    {e.first_name} {e.last_name}
+                    {employeeMap.get(e.user_id)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -168,13 +178,13 @@ export function PresenceSessionsPage() {
               {
                 header: 'Employee',
                 accessor: (row: PresenceSession) => {
-                  const name = employeeMap.get(row.user_id) ?? `Device ${row.user_id.slice(0, 8)}`
+                  const name = employeeMap.get(row.user_id)
                   return (
                     <div className="flex items-center gap-3">
                       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 font-label text-label-sm font-semibold text-primary">
-                        {employeeMap.has(row.user_id) ? initials(name) : '?'}
+                        {name ? initials(name) : '?'}
                       </div>
-                      <span className="truncate font-medium text-foreground">{name}</span>
+                      <span className="truncate font-medium text-foreground">{name ?? 'Employee unavailable'}</span>
                     </div>
                   )
                 },

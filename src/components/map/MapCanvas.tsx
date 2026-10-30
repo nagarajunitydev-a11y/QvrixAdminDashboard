@@ -101,6 +101,7 @@ const circleToneStyles = {
 export function MapCanvas({
   center,
   zoom = 13,
+  focusKey,
   markers = [],
   circles = [],
   polygons = [],
@@ -122,6 +123,8 @@ export function MapCanvas({
 }: {
   center: LatLng
   zoom?: number
+  /** Changing this re-applies `center` and `zoom`, even if their values are unchanged. */
+  focusKey?: string | number
   markers?: MapMarker[]
   circles?: MapCircle[]
   polygons?: MapPolygon[]
@@ -167,7 +170,7 @@ export function MapCanvas({
   const markerDragRef = useRef<{ id: string; moved: boolean } | null>(null)
   const vertexDragRef = useRef<{ polygonId: string; index: number } | null>(null)
 
-  const controlledRef = useRef({ center, zoom })
+  const controlledRef = useRef({ center, zoom, focusKey })
 
   // Sync external center/zoom (e.g. selecting a site in the list).
   useEffect(() => {
@@ -176,13 +179,14 @@ export function MapCanvas({
       Math.abs(previous.center.lat - center.lat) > 1e-9 ||
       Math.abs(previous.center.lng - center.lng) > 1e-9
     const zoomChanged = previous.zoom !== zoom
-    if (!centerChanged && !zoomChanged) return
-    controlledRef.current = { center, zoom }
+    const refocused = previous.focusKey !== focusKey
+    if (!centerChanged && !zoomChanged && !refocused) return
+    controlledRef.current = { center, zoom, focusKey }
     setView((current) => ({
       center,
-      zoom: zoomChanged ? zoom : current.zoom,
+      zoom: zoomChanged || refocused ? zoom : current.zoom,
     }))
-  }, [center, zoom])
+  }, [center, zoom, focusKey])
 
   useEffect(() => {
     const element = containerRef.current

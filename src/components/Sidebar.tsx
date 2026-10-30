@@ -25,6 +25,7 @@ import {
   Sun,
   UserCog,
   Users,
+  UsersRound,
   X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -39,6 +40,7 @@ const navGroups = [
       { label: 'Live Tracking', to: '/live-tracking', icon: Radar },
       { label: 'Employees', to: '/employees', icon: Users },
       { label: 'Sites & Geofences', to: '/sites', icon: MapPinned },
+      { label: 'Site Workers', to: '/site-workers', icon: UsersRound },
     ],
   },
   {
@@ -71,6 +73,7 @@ const routeTitles: Array<[string, string]> = [
   ['/live-tracking', 'Live Tracking'],
   ['/employees', 'Employees'],
   ['/sites', 'Sites & Geofences'],
+  ['/site-workers', 'Site Workers'],
   ['/attendance', 'Attendance'],
   ['/presence', 'Attendance'],
   ['/shifts', 'Shifts'],
