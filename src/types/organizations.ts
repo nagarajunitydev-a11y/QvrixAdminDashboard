@@ -19,6 +19,15 @@ export interface OrganizationMember {
   last_sign_in_at: string | null
 }
 
+/** Open invitation as listed to the organization's managers: only what the admin typed. */
+export interface OrganizationInvitation {
+  id: string
+  email: string
+  role: OrganizationMember['role']
+  invited_at: string
+  expires_at: string
+}
+
 export type DeviceStatus = 'active' | 'pending_review' | 'revoked'
 export type DeviceTrackingStatus = 'tracking' | 'idle' | 'permission_denied' | 'location_disabled' | 'unknown'
 

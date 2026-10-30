@@ -9,10 +9,21 @@ export interface ConsoleOrganization {
   role: ConsoleRole
 }
 
+/** An open Console-role invitation for the signed-in account's confirmed email. */
+export interface ConsoleInvitation {
+  id: string
+  organization_id: string
+  organization_name: string
+  role: Exclude<ConsoleRole, 'platform_admin'>
+  expires_at: string
+}
+
 /** Shape returned by the `my_console_access` RPC. */
 export interface ConsoleAccess {
   is_platform_admin: boolean
   organizations: ConsoleOrganization[]
+  /** Absent before migration 20261030000002. */
+  invitations?: ConsoleInvitation[]
 }
 
 export const roleLabels: Record<ConsoleRole, string> = {
@@ -20,6 +31,19 @@ export const roleLabels: Record<ConsoleRole, string> = {
   org_admin: 'Organization admin',
   manager: 'Manager',
   supervisor: 'Supervisor',
+}
+
+/**
+ * Explains a failed access check. Supabase returns plain objects, not Error instances, so a
+ * generic `instanceof Error` check would hide the real cause behind "something went wrong".
+ */
+export function consoleAccessErrorMessage(error: unknown): string {
+  const { code, message } = (error ?? {}) as { code?: unknown; message?: unknown }
+  // PGRST202: the my_console_access RPC does not exist, i.e. the organizations migration is not applied.
+  if (code === 'PGRST202') {
+    return 'This Console version needs the organization update, but the Supabase database has not been upgraded yet. Apply migration 20261030000000_organizations_identity_devices.sql, then sign in again.'
+  }
+  return typeof message === 'string' && message ? message : 'Console access could not be checked. Try again.'
 }
 
 /** Keep the stored choice only while the account can still open that organization. */

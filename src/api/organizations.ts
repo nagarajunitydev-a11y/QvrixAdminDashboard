@@ -6,6 +6,7 @@ import type {
   DeviceAssignment,
   DeviceEvent,
   EmployeeAccountCandidate,
+  OrganizationInvitation,
   OrganizationMember,
   UnlinkedAccount,
 } from '../types/organizations'
@@ -42,13 +43,49 @@ export async function fetchOrganizationMembers(): Promise<OrganizationMember[]> 
   return data as OrganizationMember[]
 }
 
-export async function setOrganizationMember(email: string, role: OrganizationMember['role']): Promise<void> {
-  const { error } = await supabase.rpc('set_organization_member', {
+/**
+ * Stores an invitation. The response is the same whether or not the email has an account;
+ * membership starts only when that person signs in and accepts.
+ */
+export async function inviteOrganizationMember(email: string, role: OrganizationMember['role']): Promise<void> {
+  const { error } = await supabase.rpc('invite_organization_member', {
     p_organization_id: currentOrganizationId(),
     p_email: email.trim(),
     p_role: role,
   })
-  if (error) throw mutationError(error, 'save this Console role')
+  if (error) throw mutationError(error, 'send this invitation')
+}
+
+export async function fetchOrganizationInvitations(): Promise<OrganizationInvitation[]> {
+  const { data, error } = await supabase.rpc('list_organization_invitations', {
+    p_organization_id: currentOrganizationId(),
+  })
+  if (error) throw error
+  return data as OrganizationInvitation[]
+}
+
+export async function revokeOrganizationInvitation(invitationId: string): Promise<void> {
+  const { error } = await supabase.rpc('revoke_organization_invitation', { p_invitation_id: invitationId })
+  if (error) throw mutationError(error, 'revoke this invitation')
+}
+
+export async function setOrganizationMemberRole(userId: string, role: OrganizationMember['role']): Promise<void> {
+  const { error } = await supabase.rpc('set_organization_member_role', {
+    p_organization_id: currentOrganizationId(),
+    p_user_id: userId,
+    p_role: role,
+  })
+  if (error) throw mutationError(error, 'change this Console role')
+}
+
+/** The signed-in invitee accepts or declines; returns the invitation's organization. */
+export async function respondToConsoleInvitation(invitationId: string, accept: boolean): Promise<string> {
+  const { data, error } = await supabase.rpc('respond_to_console_invitation', {
+    p_invitation_id: invitationId,
+    p_accept: accept,
+  })
+  if (error) throw mutationError(error, accept ? 'accept this invitation' : 'decline this invitation')
+  return data as string
 }
 
 export async function deactivateOrganizationMember(userId: string): Promise<void> {

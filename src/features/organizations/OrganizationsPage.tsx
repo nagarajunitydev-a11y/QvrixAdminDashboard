@@ -126,13 +126,13 @@ export function OrganizationsPage() {
             <Input id="org-timezone" value={timezone} onChange={(event) => setTimezone(event.target.value)} />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="org-admin">First organization admin (optional)</Label>
+            <Label htmlFor="org-admin">Invite the first organization admin (optional)</Label>
             <Input
               id="org-admin"
               type="email"
               value={adminEmail}
               onChange={(event) => setAdminEmail(event.target.value)}
-              placeholder="Confirmed account email"
+              placeholder="Email to invite"
             />
           </div>
           {create.error && (

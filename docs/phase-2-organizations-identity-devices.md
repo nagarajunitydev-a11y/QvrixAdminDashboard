@@ -1,7 +1,14 @@
 # Phase 2: organizations, employee identity and devices
 
-Status on 2026-10-30: the code and migration are ready and tested locally. The migration has
-**not** been applied to the live project (`eqyycmmbcesrtxuawyyb`), and the Android part has not started.
+Status on 2026-10-30 (13:30 UTC): applied to the live project (`eqyycmmbcesrtxuawyyb`) as
+`20261030000000` plus the follow-up `20261030000001`. A JSON export of every public table was taken
+first. The Android part has not started.
+
+`20261030000001` removes the original single-column foreign keys that the new composite keys duplicate.
+With both present, PostgREST found two relationships per pair and failed every embed such as
+`employees?select=*,departments(name)` with `PGRST201` (HTTP 300), which broke the Employees, Shifts,
+Attendance and Assignments pages for about 13 minutes. `npm run test:db` now checks that every table
+pair has exactly one relationship.
 
 ## Why organizations come first
 
@@ -64,13 +71,15 @@ send `organization_id`, and the triggers fill it in. Two deliberate behaviour ch
 
 ## Rollout order
 
-1. Back up the database (Supabase dashboard → Database → Backups). There is no down migration.
-2. Mark the already-applied data repair as recorded, then push:
-   `supabase migration repair --status applied 20261029000000` and `supabase db push`.
-   The migration runs in one transaction: it either applies fully or not at all.
+1. Done: backed up (JSON export of all public tables). There is no down migration.
+2. Done: recorded the already-applied data repair `20261029000000` (re-running it would have auto-linked
+   accounts without consent), then `supabase db push` applied `20261030000000` and `20261030000001`.
 3. Grant the first platform admin:
    `insert into public.platform_admins (user_id) select id from auth.users where email = '<email>';`
-4. Deploy the Console. The new Console requires the migration; the old one works with or without it.
+4. Deploy the Console. The new Console requires the migration; the old one works with or without it
+   (verified on the deployed site after both migrations). Browsers that loaded the deployed Console
+   between the two migrations may hold cached `300` responses: a hard refresh clears them. The new
+   Console requests API data with `cache: 'no-store'`, so it cannot replay a cached error.
 5. Android: accept invitations after sign-in (`my_employee_invitations` / `accept_employee_invitation`) and
    register the device (`register_device`) after sign-in and on each sync. Until then, new employees are linked
    by a platform admin or by setting `app_metadata` `{ "role": "employee", "organization_id": "<uuid>" }`.
@@ -90,13 +99,19 @@ send `organization_id`, and the triggers fill it in. Two deliberate behaviour ch
 
 ## Open items
 
-- Not yet run against the live database. PGlite is Postgres 18; production is 17.6.
+- `fetchEmployeeLocations` in `services.ts` is unused and its embed hint `employee_sites_sites` never
+  matched a constraint; it fails with `PGRST200` (also before Phase 2).
 - Android: device registration, and showing "waiting for approval" / "revoked" in the app.
 - Revoking a device is recorded, but uploads are not yet blocked per device; uploads carry no device ID
   until the Phase 5 sync changes.
 - Supervisors see the whole organization. Site-scoped supervisors need a supervisor–site table (Phase 4).
 - `mutationErrors` maps every `42501` to a generic permission message, which hides specific reasons such
   as cross-organization site use.
-- `set_organization_member` grants a Console role to any confirmed account by email, and its error reveals
-  whether that email has an account. Granting only gives the account access to the granting organization,
-  but an accept-to-join step for Console roles would close the email probe.
+- Resolved: Console roles by invitation (`20261030000002`, applied 2026-10-30 at 14:53 UTC after a JSON
+  backup; verified with the organization admin account on every page). `set_organization_member` attached any confirmed account by email without consent,
+  revealed whether the email had an account, and exposed its last sign-in time. It is replaced by
+  `invite_organization_member`, which stores an email-keyed invitation, never consults `auth.users`
+  and returns the same response for every email. Membership starts only when the signed-in holder of that
+  confirmed email accepts (`respond_to_console_invitation`); the Console shows open invitations at sign-in.
+  Role changes (`set_organization_member_role`) apply only to existing members. Invitations expire after
+  14 days and are audited. Invitees still need a Supabase Auth account to sign in.

@@ -2,9 +2,12 @@
 // synthetic, production-shaped data. Never connects to the live database.
 // Run: npm run test:db [-- path/to/migration.sql]
 import { PGlite } from '@electric-sql/pglite'
-import { readFileSync } from 'node:fs'
-const MIGRATION = process.argv[2]
-  ?? new URL('../../migrations/20261030000000_organizations_identity_devices.sql', import.meta.url)
+import { readdirSync, readFileSync } from 'node:fs'
+// Every migration from Phase 2 on, in version order, unless specific files are passed.
+const migrationsDir = new URL('../../migrations/', import.meta.url)
+const MIGRATIONS = process.argv.length > 2
+  ? process.argv.slice(2)
+  : readdirSync(migrationsDir).filter((name) => name >= '20261030000000').sort().map((name) => new URL(name, migrationsDir))
 const db = new PGlite()
 const U = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
 const id = { m1: U(1), m2: U(2), m3: U(3), e1: U(11), e2: U(12), e3: U(13), p1: U(21), bAdmin: U(31), bEmp: U(32), bEmp2: U(33), aSup: U(34), u9: U(41) }
@@ -56,8 +59,16 @@ const counts = `select (select count(*) from presence_sessions)::int s, (select 
 const before = (await q(counts))[0]
 
 // --- apply the migration as its owner ---
-await db.exec(readFileSync(MIGRATION, 'utf8'))
-console.log('migration applied')
+for (const migration of MIGRATIONS) await db.exec(readFileSync(migration, 'utf8'))
+console.log(`migrations applied: ${MIGRATIONS.length}`)
+
+// PostgREST can only embed a related table (e.g. employees?select=departments(name)) when exactly
+// one foreign key links the pair; a second one fails every such read with PGRST201.
+const ambiguous = await q(`select conrelid::regclass::text as t, confrelid::regclass::text as r, count(*)::int as n
+  from pg_constraint where contype = 'f' and connamespace = 'public'::regnamespace
+    and confrelid in (select oid from pg_class where relnamespace = 'public'::regnamespace)
+  group by 1, 2 having count(*) > 1`)
+ok('every table pair has one relationship (PostgREST embeds resolve)', ambiguous.length === 0, JSON.stringify(ambiguous))
 
 // T1 backfill and access preservation
 const qvrix = (await q(`select id from organizations where slug='qvrix'`))[0].id
@@ -83,7 +94,11 @@ await db.exec(`insert into auth.users (id,email,raw_app_meta_data,email_confirme
  insert into platform_admins (user_id) values ('${id.p1}');`)
 ok('non-platform cannot create org', await err(() => as(id.m1, () => q(`select create_organization('X','x-org')`))) === '42501')
 const beta = (await as(id.p1, () => q(`select create_organization('Beta Builders','beta','Asia/Kolkata','admin@beta.test') id`)))[0].id
-ok('beta admin membership', (await q(`select role from organization_members where organization_id=$1 and user_id=$2`, [beta, id.bAdmin]))[0]?.role === 'org_admin')
+ok('first admin is invited, not attached', (await q(`select count(*)::int n from organization_members where organization_id=$1`, [beta]))[0].n === 0)
+const bAdminAccess = (await as(id.bAdmin, () => q(`select public.my_console_access() a`)))[0].a
+ok('invited admin sees the invitation, not the organization', bAdminAccess.organizations.length === 0 && bAdminAccess.invitations.length === 1 && bAdminAccess.invitations[0].role === 'org_admin', JSON.stringify(bAdminAccess))
+await as(id.bAdmin, () => q(`select respond_to_console_invitation($1, true)`, [bAdminAccess.invitations[0].id]))
+ok('beta admin membership after accepting', (await q(`select role from organization_members where organization_id=$1 and user_id=$2`, [beta, id.bAdmin]))[0]?.role === 'org_admin')
 ok('bad timezone rejected', await err(() => as(id.p1, () => q(`select create_organization('Y','y-org','Mars/Base')`))) === '22023')
 ok('platform admin sees both orgs in console', (await as(id.p1, () => q(`select public.my_console_access() a`)))[0].a.organizations.length === 2)
 
@@ -185,14 +200,57 @@ ok('same-org assignment allowed', await err(() => as(id.bAdmin, () => q(`insert 
 ok('anon sees nothing', (await as(null, () => q(`select count(*)::int n from sites`), 'anon'))[0].n === 0)
 ok('anon cannot read organizations', await err(() => as(null, () => q(`select count(*) from organizations`), 'anon')) === '42501')
 
-// T7 roles: supervisors read, cannot write; last admin protected
-await as(id.m1, () => q(`select set_organization_member($1,'sup@qvrix.test','supervisor')`, [qvrix]))
+/// T7 Console roles by invitation: no account probing, no attachment without consent
+const invite = (uid, org, email, role) => as(uid, () => q(`select invite_organization_member($1,$2,$3) id`, [org, email, role]))
+const supInvite = (await invite(id.m1, qvrix, 'sup@qvrix.test', 'supervisor'))[0].id
+const unknownInvite = await err(() => invite(id.m1, qvrix, 'nobody-here@unknown.test', 'manager'))
+const knownInvite = await err(() => invite(id.m1, qvrix, 'E2@Qvrix.test', 'manager'))
+ok('same response whether or not the email has an account', unknownInvite === null && knownInvite === null)
+ok('invitation email stored normalized', (await q(`select count(*)::int n from organization_invitations where email='e2@qvrix.test'`))[0].n === 1)
+ok('an invitation grants nothing', (await q(`select count(*)::int n from organization_members where user_id in ($1,$2)`, [id.e2, id.aSup]))[0].n === 0)
+ok('invitee has no Console access before accepting', (await as(id.e2, () => q(`select public.my_console_access() a`)))[0].a.organizations.length === 0)
+const pending = await as(id.m1, () => q(`select * from list_organization_invitations($1)`, [qvrix]))
+ok('pending list shows only what the admin typed', pending.length === 3 && pending.every((row) => !('user_id' in row) && !('last_sign_in_at' in row)), JSON.stringify(pending))
+ok('invitees are not listed as members', !(await as(id.m1, () => q(`select * from list_organization_members($1)`, [qvrix]))).some((row) => row.email === 'e2@qvrix.test'))
+ok('other organizations cannot read the invitations', await err(() => as(id.bAdmin, () => q(`select * from list_organization_invitations($1)`, [qvrix]))) === '42501' && await n(id.bAdmin, `select count(*)::int n from organization_invitations where organization_id = $1`, [qvrix]) === 0)
+ok('other organizations cannot invite', await err(() => invite(id.bAdmin, qvrix, 'x@qvrix.test', 'manager')) === '42501')
+ok('employees cannot invite', await err(() => invite(id.e1, qvrix, 'x@qvrix.test', 'manager')) === '42501')
+ok('invalid email rejected', await err(() => invite(id.m1, qvrix, 'not-an-email', 'manager')) === '22023')
+ok('existing members cannot be re-invited', await err(() => invite(id.m1, qvrix, 'M2@qvrix.test', 'supervisor')) === '23505')
+ok('old attach-by-email function removed', await err(() => as(id.m1, () => q(`select set_organization_member($1,'e3@qvrix.test','manager')`, [qvrix]))) === '42883')
+const e2Invites = await as(id.e2, () => q(`select * from my_console_invitations()`))
+ok('invitee sees the invitation with the organization name', e2Invites.length === 1 && e2Invites[0].organization_name === 'Qvrix' && e2Invites[0].role === 'manager', JSON.stringify(e2Invites))
+ok('nobody else sees it', (await as(id.e1, () => q(`select * from my_console_invitations()`))).length === 0)
+ok('cannot accept an invitation for another email', await err(() => as(id.e1, () => q(`select respond_to_console_invitation($1, true)`, [e2Invites[0].id]))) === '42501')
+await as(id.e2, () => q(`select respond_to_console_invitation($1, false)`, [e2Invites[0].id]))
+ok('declining grants nothing and closes the invitation', (await q(`select count(*)::int n from organization_members where user_id=$1`, [id.e2]))[0].n === 0 && (await as(id.e2, () => q(`select * from my_console_invitations()`))).length === 0)
+ok('a declined invitation cannot be accepted', await err(() => as(id.e2, () => q(`select respond_to_console_invitation($1, true)`, [e2Invites[0].id]))) === '42501')
+await invite(id.m1, qvrix, 'e2@qvrix.test', 'manager')
+const e2Again = (await as(id.e2, () => q(`select * from my_console_invitations()`)))[0]
+ok('accepting creates the membership', (await as(id.e2, () => q(`select respond_to_console_invitation($1, true) o`, [e2Again.id])))[0].o === qvrix
+  && (await q(`select role from organization_members where user_id=$1 and organization_id=$2`, [id.e2, qvrix]))[0]?.role === 'manager')
+ok('accepted invitation cannot be reused', await err(() => as(id.e2, () => q(`select respond_to_console_invitation($1, true)`, [e2Again.id]))) === '42501')
+ok('accepted member is listed', (await as(id.m1, () => q(`select * from list_organization_members($1)`, [qvrix]))).some((row) => row.email === 'e2@qvrix.test'))
+ok('managers cannot invite (admins only)', await err(() => invite(id.e2, qvrix, 'x@qvrix.test', 'supervisor')) === '42501')
+const e3Invite = (await invite(id.m1, qvrix, 'e3@qvrix.test', 'supervisor'))[0].id
+await db.query(`update organization_invitations set expires_at = now() - interval '1 day' where id=$1`, [e3Invite])
+ok('expired invitations are hidden and refused', (await as(id.e3, () => q(`select * from my_console_invitations()`))).length === 0
+  && await err(() => as(id.e3, () => q(`select respond_to_console_invitation($1, true)`, [e3Invite]))) === '42501')
+ok('other organizations cannot revoke', await err(() => as(id.bAdmin, () => q(`select revoke_organization_invitation($1)`, [e3Invite]))) === '42501')
+await as(id.m1, () => q(`select revoke_organization_invitation($1)`, [e3Invite]))
+ok('admins revoke open invitations', (await q(`select revoked_at is not null r from organization_invitations where id=$1`, [e3Invite]))[0].r === true)
+await as(id.aSup, () => q(`select respond_to_console_invitation($1, true)`, [supInvite]))
+ok('role changes only for existing members', await err(() => as(id.m1, () => q(`select set_organization_member_role($1,$2,'manager')`, [qvrix, U(53)]))) === 'P0002')
+ok('admins change a member role', await err(() => as(id.m1, () => q(`select set_organization_member_role($1,$2,'supervisor')`, [qvrix, id.e2]))) === null
+  && (await q(`select role from organization_members where user_id=$1 and organization_id=$2`, [id.e2, qvrix]))[0].role === 'supervisor')
+ok('invitations are audited', (await q(`select count(*)::int n from audit_logs where table_name='organization_invitations' and organization_id=$1`, [qvrix]))[0].n >= 5)
+// Roles: supervisors read, cannot write; last admin protected
 ok('supervisor reads attendance', await n(id.aSup, `select count(*)::int n from presence_sessions`) > 0)
 ok('supervisor cannot create sites', await err(() => as(id.aSup, () => q(`insert into sites (name, latitude, longitude, organization_id) values ('No',1,1,$1)`, [qvrix]))) === '42501')
 ok('supervisor cannot read audit', await n(id.aSup, `select count(*)::int n from audit_logs`) === 0)
-ok('supervisor cannot assign roles', await err(() => as(id.aSup, () => q(`select set_organization_member($1,'m2@qvrix.test','supervisor')`, [qvrix]))) === '42501')
+ok('supervisor cannot invite', await err(() => invite(id.aSup, qvrix, 'x@qvrix.test', 'supervisor')) === '42501')
 ok('last beta admin protected', await err(() => as(id.bAdmin, () => q(`select deactivate_organization_member($1,$2)`, [beta, id.bAdmin]))) === '22023')
-ok('last admin cannot demote self', await err(() => as(id.bAdmin, () => q(`select set_organization_member($1,'admin@beta.test','manager')`, [beta]))) === '22023')
+ok('last admin cannot demote self', await err(() => as(id.bAdmin, () => q(`select set_organization_member_role($1,$2,'manager')`, [beta, id.bAdmin]))) === '22023')
 ok('members listed with email', (await as(id.m1, () => q(`select * from list_organization_members($1)`, [qvrix]))).some(r => r.email === 'sup@qvrix.test'))
 ok('org admin renames own org', await err(() => as(id.bAdmin, () => q(`update organizations set name='Beta Builders Pvt Ltd' where id=$1`, [beta]))) === null)
 ok('org admin cannot rename other org', await n(id.bAdmin, `with u as (update organizations set name='x' where id='${qvrix}' returning 1) select count(*)::int n from u`) === 0)

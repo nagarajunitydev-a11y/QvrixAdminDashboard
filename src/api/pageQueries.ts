@@ -30,7 +30,7 @@ export const PAGE_QUERY_KEYS: Record<string, string[]> = {
     'report-location-logs',
   ],
   '/assignments': ['employee-sites', 'employees', 'sites'],
-  '/users': ['employees', 'employee-sites', 'organization-members', 'employee-account-candidates'],
+  '/users': ['employees', 'employee-sites', 'organization-members', 'organization-invitations', 'employee-account-candidates'],
   '/devices': ['devices', 'employees', 'unlinked-accounts', 'device-history'],
   '/organizations': ['console-access'],
   '/settings': [],

@@ -37,7 +37,7 @@ const accessModel = [
     surface: 'Console',
     variant: 'success',
     tick: 'text-emerald-500',
-    permissions: ['Everything a manager can do', 'Grant and remove Console roles', 'Edit organization settings'],
+    permissions: ['Everything a manager can do', 'Invite people and manage Console roles', 'Edit organization settings'],
   },
   {
     role: roleLabels.manager,
@@ -453,8 +453,8 @@ export function UsersRolesPage() {
       <div className="flex flex-col gap-2 rounded-xl border border-border/70 bg-muted/30 px-4 py-3 text-[11px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <p className="flex items-start gap-2">
           <UserCog className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
-          Organization admins grant Console roles here. Sign-in accounts and invitations are still
-          created in Supabase Auth; this Console never edits authentication records.
+          Organization admins invite people here; they join only after signing in and accepting. Sign-in
+          accounts are still created in Supabase Auth; this Console never edits authentication records.
         </p>
         <Link to="/audit" className="inline-flex shrink-0 items-center gap-1 font-medium text-primary hover:underline">
           Review audit trail <ArrowRight className="h-3 w-3" />

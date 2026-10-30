@@ -3,7 +3,9 @@ import { ShieldOff } from 'lucide-react'
 import { useAuth } from '../api/AuthProvider'
 import { useOrganization } from '../api/OrganizationProvider'
 import { Button } from '@/components/ui/button'
+import { ConsoleInvitations } from '@/components/ConsoleInvitations'
 import { ErrorState } from '@/components/ui/states'
+import { consoleAccessErrorMessage } from '@/lib/consoleAccess'
 
 function FullScreenSpinner() {
   return (
@@ -32,13 +34,27 @@ export function ProtectedRoute() {
 
   if (access.error) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-6">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 p-6">
         <ErrorState
           className="w-full max-w-lg"
           title="Console access could not be checked"
-          description="Your organization roles could not be loaded. Check your connection and try again."
+          description={consoleAccessErrorMessage(access.error)}
           onRetry={access.retry}
         />
+        <Button variant="outline" onClick={() => void signOut()}>Sign out</Button>
+      </div>
+    )
+  }
+
+  // Signed in with open invitations but no organization yet: accept or decline first.
+  if (!access.organization && access.invitations.length) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 p-6">
+        <ConsoleInvitations className="w-full max-w-lg" />
+        <p className="max-w-lg text-center text-[11px] text-muted-foreground">
+          Signed in as {session.user.email}. Accepting gives you Console access to that organization.
+        </p>
+        <Button variant="outline" onClick={() => void signOut()}>Sign out</Button>
       </div>
     )
   }

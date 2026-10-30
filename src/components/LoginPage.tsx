@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../api/AuthProvider'
 import { consoleAccessKey, fetchConsoleAccess } from '../api/OrganizationProvider'
+import { consoleAccessErrorMessage, type ConsoleAccess } from '@/lib/consoleAccess'
 import { queryClient } from '../api/queryClient'
 import { supabase } from '../api/supabase'
 import { Button } from './ui/button'
@@ -112,10 +113,19 @@ export function LoginPage({ mode = 'login' }: { mode?: 'login' | 'forgot' | 'res
       }
       const session = await signIn(email, password)
       // Console access is an organization role checked by the server, not editable profile data.
-      const access = session
-        ? await queryClient.fetchQuery({ queryKey: consoleAccessKey(session.user.id), queryFn: fetchConsoleAccess })
-        : null
-      if (!access?.organizations.length) {
+      let access: ConsoleAccess | null = null
+      try {
+        access = session
+          ? await queryClient.fetchQuery({ queryKey: consoleAccessKey(session.user.id), queryFn: fetchConsoleAccess })
+          : null
+      } catch (accessError) {
+        // Never leave a signed-in session behind a failed access check.
+        await signOut()
+        setError(consoleAccessErrorMessage(accessError))
+        return
+      }
+      // An account with only open invitations signs in to accept or decline them.
+      if (!access?.organizations.length && !access?.invitations?.length) {
         await signOut()
         setError('This account has no Crewtraxa Console role. Field employees sign in on the Crewtraxa Employee app.')
         return

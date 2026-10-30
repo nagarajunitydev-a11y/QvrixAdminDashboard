@@ -7,6 +7,7 @@ import {
   consoleCapabilities,
   resolveActiveOrganization,
   type ConsoleAccess,
+  type ConsoleInvitation,
   type ConsoleOrganization,
   type ConsoleRole,
 } from '@/lib/consoleAccess'
@@ -27,6 +28,8 @@ interface OrganizationContextValue {
   error: unknown
   retry: () => void
   organizations: ConsoleOrganization[]
+  /** Open Console-role invitations waiting for this account to accept or decline. */
+  invitations: ConsoleInvitation[]
   organization: ConsoleOrganization | null
   role: ConsoleRole | null
   isPlatformAdmin: boolean
@@ -78,6 +81,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         error: accessQuery.error,
         retry: () => void accessQuery.refetch(),
         organizations: access?.organizations ?? [],
+        invitations: access?.invitations ?? [],
         organization,
         role,
         isPlatformAdmin,

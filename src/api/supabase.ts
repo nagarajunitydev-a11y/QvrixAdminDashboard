@@ -51,5 +51,9 @@ export const supabase = createClient(supabaseUrl!, supabaseAnonKey!, {
     headers: {
       apikey: supabaseAnonKey!,
     },
+    // Supabase responses carry no Cache-Control header, so browsers may heuristically cache
+    // them, including error responses such as PostgREST's 300. A cached error then outlives
+    // the server-side fix. Live workforce data must always come from the server.
+    fetch: (input, init) => fetch(input, { ...init, cache: 'no-store' }),
   },
 })

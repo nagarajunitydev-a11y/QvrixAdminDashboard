@@ -7,11 +7,24 @@ const source = ts.transpileModule(readFileSync(new URL('../src/lib/consoleAccess
   compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.ESNext },
 }).outputText
 const {
+  consoleAccessErrorMessage,
   consoleCapabilities,
   deviceHolderLabel,
   resolveActiveOrganization,
   unlinkedAccountLabel,
 } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'))
+
+test('a database without the organization upgrade is named instead of "something went wrong"', () => {
+  // Exact PostgREST payload returned by the live project before the Phase 2 migration.
+  const missing = { code: 'PGRST202', message: 'Could not find the function public.my_console_access without parameters in the schema cache', details: null, hint: null }
+  assert.match(consoleAccessErrorMessage(missing), /database has not been upgraded/i)
+})
+
+test('database and network errors keep their own message even though they are not Error instances', () => {
+  assert.equal(consoleAccessErrorMessage({ code: '42501', message: 'permission denied for function my_console_access' }), 'permission denied for function my_console_access')
+  assert.equal(consoleAccessErrorMessage(new TypeError('Failed to fetch')), 'Failed to fetch')
+  assert.match(consoleAccessErrorMessage(undefined), /could not be checked/i)
+})
 
 const org = (id, role, is_active = true) => ({ id, name: id, slug: id, timezone: 'Asia/Kolkata', is_active, role })
 
