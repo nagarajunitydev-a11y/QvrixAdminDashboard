@@ -274,8 +274,126 @@ export async function updateEmployee(id: string, payload: EmployeeUpdate): Promi
   return data
 }
 
-export async function deleteEmployee(id: string): Promise<void> {
-  await deleteRecord('employees', id, 'employee')
+// Employees are never deleted: their attendance and location history stays attached. Archiving makes
+// the profile inactive (ending app access) and is reversible; the server stamps who and when.
+export async function archiveEmployees(ids: string[]): Promise<number> {
+  const { data, error } = await from('employees')
+    .update({ archived_at: new Date().toISOString() })
+    .in('id', ids)
+    .is('archived_at', null)
+    .select('id')
+  if (error) throw mutationError(error, 'archive employees')
+  return data.length
+}
+
+export async function restoreEmployees(ids: string[]): Promise<number> {
+  const { data, error } = await from('employees')
+    .update({ archived_at: null, is_active: true })
+    .in('id', ids)
+    .not('archived_at', 'is', null)
+    .select('id')
+  if (error) throw mutationError(error, 'restore employees')
+  return data.length
+}
+
+/** One statement, so a bulk change applies to every selected employee or to none. */
+export async function updateEmployees(ids: string[], payload: EmployeeUpdate): Promise<number> {
+  const { data, error } = await from('employees').update(payload).in('id', ids).select('id')
+  if (error) throw mutationError(error, 'update employees')
+  if (data.length !== ids.length) {
+    throw new Error(`Updated ${data.length} of ${ids.length} employees. Refresh to see the current records.`)
+  }
+  return data.length
+}
+
+export async function assignEmployeesToSite(employeeIds: string[], siteId: string): Promise<number> {
+  const { data, error } = await from('employee_sites')
+    .upsert(
+      employeeIds.map((employee_id) => ({ employee_id, site_id: siteId, organization_id: currentOrganizationId() })),
+      { onConflict: 'employee_id,site_id', ignoreDuplicates: true },
+    )
+    .select('employee_id')
+  if (error) throw mutationError(error, 'assign employees to this site')
+  return data.length
+}
+
+export interface EmployeeImportRow {
+  first_name: string
+  last_name: string
+  email: string
+  phone: string | null
+  employee_code: string | null
+  employment_type: string | null
+  department: string | null
+  designation: string | null
+  shift_id: string | null
+  hire_date: string | null
+}
+
+/**
+ * Creates the departments and designations the file names but the organization lacks, then inserts
+ * every employee in a single request, so the employees are imported all together or not at all.
+ */
+export async function importEmployees(rows: EmployeeImportRow[], newDepartments: string[], newDesignations: string[]): Promise<number> {
+  const organization_id = currentOrganizationId()
+  const createNamed = async (table: 'departments' | 'designations', names: string[]) => {
+    if (names.length) {
+      const { error } = await from(table).insert(names.map((name) => ({ name, organization_id })))
+      if (error) throw mutationError(error, `create ${table}`)
+    }
+    const { data, error } = await from(table).select('id, name').eq('organization_id', organization_id)
+    if (error) throw error
+    return new Map((data as Array<{ id: string; name: string }>).map((row) => [row.name.trim().toLowerCase(), row.id]))
+  }
+  const departmentIds = await createNamed('departments', newDepartments)
+  const designationIds = await createNamed('designations', newDesignations)
+  const lookup = (ids: Map<string, string>, name: string | null) => {
+    if (!name) return null
+    const id = ids.get(name.trim().toLowerCase())
+    if (!id) throw new Error(`"${name}" could not be found after creating it. Refresh and try the import again.`)
+    return id
+  }
+
+  const { data, error } = await from('employees')
+    .insert(rows.map(({ department, designation, ...row }) => ({
+      ...row,
+      organization_id,
+      is_active: true,
+      department_id: lookup(departmentIds, department),
+      designation_id: lookup(designationIds, designation),
+    })))
+    .select('id')
+  if (error) throw mutationError(error, 'import these employees')
+  return data.length
+}
+
+export interface OnboardingCounts {
+  sites: number
+  departments: number
+  shifts: number
+  employees: number
+  assignments: number
+  linkedEmployees: number
+}
+
+export async function fetchOnboardingCounts(): Promise<OnboardingCounts> {
+  const organization_id = currentOrganizationId()
+  const count = async (table: string, filter?: (query: any) => any) => {
+    let query = from(table).select('*', { count: 'exact', head: true }).eq('organization_id', organization_id)
+    if (filter) query = filter(query)
+    const { count: total, error } = await query
+    if (error) throw error
+    return total ?? 0
+  }
+  const [sites, departments, shifts, employees, assignments, linkedEmployees] = await Promise.all([
+    count('sites'),
+    count('departments'),
+    count('shifts'),
+    count('employees', (q) => q.is('archived_at', null)),
+    count('employee_sites'),
+    count('employees', (q) => q.is('archived_at', null).not('user_id', 'is', null)),
+  ])
+  return { sites, departments, shifts, employees, assignments, linkedEmployees }
 }
 
 // Employee-Sites

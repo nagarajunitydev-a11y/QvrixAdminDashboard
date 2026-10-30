@@ -23,6 +23,7 @@ import {
   Menu,
   Moon,
   Radar,
+  Rocket,
   ScrollText,
   Settings,
   Smartphone,
@@ -41,6 +42,7 @@ const navGroups = [
     label: 'Workspace',
     items: [
       { label: 'Dashboard', to: '/', icon: LayoutDashboard },
+      { label: 'Getting Started', to: '/getting-started', icon: Rocket },
       { label: 'Live Tracking', to: '/live-tracking', icon: Radar },
       { label: 'Employees', to: '/employees', icon: Users },
       { label: 'Sites & Geofences', to: '/sites', icon: MapPinned },
@@ -76,6 +78,7 @@ const navGroups = [
 ]
 
 const routeTitles: Array<[string, string]> = [
+  ['/getting-started', 'Getting Started'],
   ['/live-tracking', 'Live Tracking'],
   ['/employees', 'Employees'],
   ['/sites', 'Sites & Geofences'],

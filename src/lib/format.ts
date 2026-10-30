@@ -44,8 +44,11 @@ export function formatHours(hours: number | null | undefined) {
 }
 
 export function downloadCsv(filename: string, header: string[], rows: Array<Array<string | number | null | undefined>>) {
-  const escape = (value: string | number | null | undefined) =>
-    `"${String(value ?? '').replace(/"/g, '""')}"`
+  // Text that starts like a formula is prefixed with ' so spreadsheet apps show it instead of running it.
+  const escape = (value: string | number | null | undefined) => {
+    const text = typeof value === 'string' && /^[=+\-@\t\r]/.test(value) ? `'${value}` : String(value ?? '')
+    return `"${text.replace(/"/g, '""')}"`
+  }
   const content = [header, ...rows].map((row) => row.map(escape).join(',')).join('\n')
   const blob = new Blob([content], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)

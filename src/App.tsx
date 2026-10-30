@@ -28,6 +28,7 @@ import { OrganizationsPage } from './features/organizations/OrganizationsPage'
 import { UsersRolesPage } from './features/users/UsersRolesPage'
 import { SettingsPage } from './features/settings/SettingsPage'
 import { AuditLogsPage } from './features/audit-logs/AuditLogsPage'
+import { GettingStartedPage } from './features/onboarding/GettingStartedPage'
 
 function App() {
   return (
@@ -44,6 +45,7 @@ function App() {
                   <Route element={<ProtectedRoute />}>
                     <Route element={<ManagerLayout />}>
                       <Route path="/" element={<DashboardPage />} />
+                      <Route path="/getting-started" element={<GettingStartedPage />} />
                       <Route path="/live-tracking" element={<LiveTrackingPage />} />
                       <Route path="/employees" element={<EmployeesPage />} />
                       <Route path="/departments" element={<DepartmentsPage />} />

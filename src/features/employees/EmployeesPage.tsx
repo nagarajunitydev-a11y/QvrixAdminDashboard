@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -9,11 +9,12 @@ import {
   fetchSites,
   createEmployee,
   updateEmployee,
-  deleteEmployee,
   fetchEmployeeSites,
   assignEmployeeToSite,
   unassignEmployeeFromSite,
 } from '@/api/services'
+import type { EmployeeWithRelations } from '@/api/services'
+import { useOrganization } from '@/api/OrganizationProvider'
 import { Employee, EmployeeInsert, EmployeeUpdate, Site } from '@/types'
 import { DataTable } from '@/components/ui/data-table'
 import { Button } from '@/components/ui/button'
@@ -26,15 +27,57 @@ import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PageHeader } from '@/components/ui/page-header'
 import { PageSkeleton } from '@/components/ui/states'
-import { Plus, Edit, Trash2, UserCheck, UserX, MapPin, Search, Users } from 'lucide-react'
+import { downloadCsv } from '@/lib/format'
+import { EMPLOYEE_CODE_PATTERN, EMPLOYMENT_TYPES, employmentTypeLabel } from '@/lib/employeeImport'
+import {
+  Archive,
+  ArchiveRestore,
+  Download,
+  Edit,
+  FileUp,
+  MapPin,
+  PencilLine,
+  Plus,
+  Search,
+  UserCheck,
+  UserX,
+  Users,
+  X,
+} from 'lucide-react'
+import { EmployeeImportDialog } from './EmployeeImportDialog'
+import { ArchiveDialog, BulkAssignSiteDialog, BulkEditDialog } from './EmployeeBulkDialogs'
+
+type StatusFilter = 'current' | 'active' | 'inactive' | 'archived'
 
 function initials(first: string, last: string) {
   return `${first[0] ?? ''}${last[0] ?? ''}`.toUpperCase()
 }
 
+function exportEmployees(employees: EmployeeWithRelations[]) {
+  downloadCsv(
+    `employees-${new Date().toISOString().slice(0, 10)}.csv`,
+    ['first_name', 'last_name', 'email', 'phone', 'employee_code', 'employment_type', 'department', 'designation', 'shift', 'hire_date', 'status', 'app_signed_in'],
+    employees.map((e) => [
+      e.first_name,
+      e.last_name,
+      e.email,
+      e.phone,
+      e.employee_code,
+      e.employment_type ? employmentTypeLabel(e.employment_type) : '',
+      e.departments?.name,
+      e.designations?.name,
+      e.shifts?.name,
+      e.hire_date,
+      e.archived_at ? 'Archived' : e.is_active ? 'Active' : 'Inactive',
+      e.user_id ? 'Yes' : 'No',
+    ]),
+  )
+}
+
 export function EmployeesPage() {
   const queryClient = useQueryClient()
-  const [searchParams] = useSearchParams()
+  const { canManage } = useOrganization()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { data: employees = [], isLoading } = useQuery({
     queryKey: ['employees'],
     queryFn: fetchEmployees,
@@ -58,41 +101,84 @@ export function EmployeesPage() {
   const [editing, setEditing] = useState<Employee | null>(null)
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null)
+  // Getting Started links here with ?import=1 to open the CSV import directly.
+  const [importOpen, setImportOpen] = useState(() => searchParams.get('import') === '1')
+  const [bulkEditOpen, setBulkEditOpen] = useState(false)
+  const [bulkSiteOpen, setBulkSiteOpen] = useState(false)
+  const [archiveTarget, setArchiveTarget] = useState<{ mode: 'archive' | 'restore'; employees: EmployeeWithRelations[] } | null>(null)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
 
   // Filters
   const [search, setSearch] = useState(searchParams.get('q') ?? '')
   const [departmentFilter, setDepartmentFilter] = useState<string>('all')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('current')
 
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [hireDate, setHireDate] = useState('')
+  const [employeeCode, setEmployeeCode] = useState('')
+  const [employmentType, setEmploymentType] = useState<string | null>(null)
   const [departmentId, setDepartmentId] = useState<string | null>(null)
   const [designationId, setDesignationId] = useState<string | null>(null)
   const [shiftId, setShiftId] = useState<string | null>(null)
   const [isActive, setIsActive] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Drop the one-time ?import=1 flag so a refresh or back navigation does not reopen the dialog.
+  useEffect(() => {
+    if (searchParams.has('import')) {
+      const next = new URLSearchParams(searchParams)
+      next.delete('import')
+      setSearchParams(next, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
+
+  const archivedCount = useMemo(() => employees.filter((e) => e.archived_at).length, [employees])
+
   const filteredEmployees = useMemo(() => {
     const q = search.trim().toLowerCase()
     return employees.filter((e) => {
-      if (q && !`${e.first_name} ${e.last_name} ${e.email}`.toLowerCase().includes(q)) return false
+      if (q && !`${e.first_name} ${e.last_name} ${e.email} ${e.employee_code ?? ''}`.toLowerCase().includes(q)) return false
       if (departmentFilter !== 'all' && e.department_id !== departmentFilter) return false
+      if (statusFilter === 'archived') return Boolean(e.archived_at)
+      if (e.archived_at) return false
       if (statusFilter === 'active' && !e.is_active) return false
       if (statusFilter === 'inactive' && e.is_active) return false
       return true
     })
   }, [employees, search, departmentFilter, statusFilter])
 
+  // Selection only ever covers rows the current filters show.
+  const selectedEmployees = useMemo(
+    () => filteredEmployees.filter((e) => selected.has(e.id)),
+    [filteredEmployees, selected],
+  )
+  const allVisibleSelected = filteredEmployees.length > 0 && selectedEmployees.length === filteredEmployees.length
+  const clearSelection = () => setSelected(new Set())
+  const toggleOne = (id: string) =>
+    setSelected((current) => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  const toggleAll = () => setSelected(allVisibleSelected ? new Set() : new Set(filteredEmployees.map((e) => e.id)))
+
+  const codeError = employeeCode.trim() && !EMPLOYEE_CODE_PATTERN.test(employeeCode.trim())
+    ? 'Use 1–32 letters, digits, or . _ / - starting with a letter or digit.'
+    : null
+
   const mutation = useMutation({
     mutationFn: async () => {
       const payload: EmployeeInsert = {
-        first_name: firstName,
-        last_name: lastName,
-        email,
-        phone: phone || null,
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        email: email.trim(),
+        phone: phone.trim() || null,
+        employee_code: employeeCode.trim() || null,
+        employment_type: employmentType,
         department_id: departmentId ?? null,
         designation_id: designationId ?? null,
         shift_id: shiftId ?? null,
@@ -107,6 +193,7 @@ export function EmployeesPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employees'] })
+      queryClient.invalidateQueries({ queryKey: ['onboarding-counts'] })
       setIsFormOpen(false)
       setEditing(null)
       resetForm()
@@ -123,21 +210,12 @@ export function EmployeesPage() {
     setEmail('')
     setPhone('')
     setHireDate('')
+    setEmployeeCode('')
+    setEmploymentType(null)
     setDepartmentId(null)
     setDesignationId(null)
     setShiftId(null)
     setIsActive(true)
-  }
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('Remove this employee? This cannot be undone.')) return
-    try {
-      await deleteEmployee(id)
-      setError(null)
-      queryClient.invalidateQueries({ queryKey: ['employees'] })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete employee')
-    }
   }
 
   const handleEdit = (e: Employee) => {
@@ -147,6 +225,8 @@ export function EmployeesPage() {
     setEmail(e.email)
     setPhone(e.phone ?? '')
     setHireDate(e.hire_date ?? '')
+    setEmployeeCode(e.employee_code ?? '')
+    setEmploymentType(e.employment_type ?? null)
     setDepartmentId(e.department_id ?? null)
     setDesignationId(e.designation_id ?? null)
     setShiftId(e.shift_id ?? null)
@@ -169,7 +249,7 @@ export function EmployeesPage() {
 
   const handleToggleActive = async (e: Employee) => {
     try {
-      await updateEmployee(e.id, { is_active: !e.is_active } as EmployeeUpdate)
+      await updateEmployee(e.id, { is_active: !e.is_active })
       setError(null)
       queryClient.invalidateQueries({ queryKey: ['employees'] })
     } catch (err) {
@@ -181,6 +261,8 @@ export function EmployeesPage() {
     return <PageSkeleton cards={0} rows={7} />
   }
 
+  const viewingArchived = statusFilter === 'archived'
+
   return (
     <div className="page-shell">
       <PageHeader
@@ -189,10 +271,24 @@ export function EmployeesPage() {
         description="Manage personnel, site assignments, and real-time status."
         icon={Users}
         actions={
-          <Button onClick={handleAdd} className="shrink-0 gap-2">
-            <Plus className="h-4 w-4" />
-            Add Employee
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => exportEmployees(filteredEmployees)} className="gap-2" disabled={filteredEmployees.length === 0}>
+              <Download className="h-4 w-4" />
+              Export
+            </Button>
+            {canManage && (
+              <>
+                <Button variant="outline" onClick={() => setImportOpen(true)} className="gap-2">
+                  <FileUp className="h-4 w-4" />
+                  Import CSV
+                </Button>
+                <Button onClick={handleAdd} className="shrink-0 gap-2">
+                  <Plus className="h-4 w-4" />
+                  Add Employee
+                </Button>
+              </>
+            )}
+          </div>
         }
       />
 
@@ -210,13 +306,14 @@ export function EmployeesPage() {
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search name or email…"
+              placeholder="Search name, email or code…"
               className="pl-10"
+              aria-label="Search employees"
             />
           </div>
           <div className="min-w-[160px]">
             <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-              <SelectTrigger>
+              <SelectTrigger aria-label="Department">
                 <SelectValue placeholder="All Departments" />
               </SelectTrigger>
               <SelectContent>
@@ -227,29 +324,91 @@ export function EmployeesPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="min-w-[140px]">
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Statuses" />
+          <div className="min-w-[160px]">
+            <Select value={statusFilter} onValueChange={(value) => { setStatusFilter(value as StatusFilter); clearSelection() }}>
+              <SelectTrigger aria-label="Status">
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="current">Current employees</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
                 <SelectItem value="inactive">Inactive</SelectItem>
+                <SelectItem value="archived">Archived ({archivedCount})</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
         <span className="shrink-0 font-label text-label-md text-muted-foreground">
-          {filteredEmployees.length} of {employees.length} shown
+          {filteredEmployees.length} shown
         </span>
       </div>
+
+      {/* Bulk actions */}
+      {canManage && selectedEmployees.length > 0 && (
+        <div
+          className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3"
+          role="region"
+          aria-label="Bulk actions"
+        >
+          <span className="mr-2 font-label text-label-md font-semibold text-foreground">
+            {selectedEmployees.length} selected
+          </span>
+          {viewingArchived ? (
+            <Button size="sm" className="gap-2" onClick={() => setArchiveTarget({ mode: 'restore', employees: selectedEmployees })}>
+              <ArchiveRestore className="h-4 w-4" />
+              Restore
+            </Button>
+          ) : (
+            <>
+              <Button size="sm" variant="outline" className="gap-2" onClick={() => setBulkEditOpen(true)}>
+                <PencilLine className="h-4 w-4" />
+                Edit fields
+              </Button>
+              <Button size="sm" variant="outline" className="gap-2" onClick={() => setBulkSiteOpen(true)}>
+                <MapPin className="h-4 w-4" />
+                Assign site
+              </Button>
+              <Button size="sm" variant="outline" className="gap-2 hover:text-destructive" onClick={() => setArchiveTarget({ mode: 'archive', employees: selectedEmployees })}>
+                <Archive className="h-4 w-4" />
+                Archive
+              </Button>
+            </>
+          )}
+          <Button size="sm" variant="ghost" className="ml-auto gap-1" onClick={clearSelection}>
+            <X className="h-4 w-4" />
+            Clear
+          </Button>
+        </div>
+      )}
 
       {/* Table */}
       <Card className="overflow-hidden">
         <CardContent className="p-0 pt-0">
           <DataTable
             columns={[
+              ...(canManage
+                ? [{
+                    header: (
+                      <input
+                        type="checkbox"
+                        checked={allVisibleSelected}
+                        onChange={toggleAll}
+                        aria-label={`Select all ${filteredEmployees.length} shown employees`}
+                        className="h-4 w-4 rounded border-input accent-primary"
+                      />
+                    ),
+                    accessor: (row: EmployeeWithRelations) => (
+                      <input
+                        type="checkbox"
+                        checked={selected.has(row.id)}
+                        onChange={() => toggleOne(row.id)}
+                        aria-label={`Select ${row.first_name} ${row.last_name}`}
+                        className="h-4 w-4 rounded border-input accent-primary"
+                      />
+                    ),
+                    className: 'w-10',
+                  }]
+                : []),
               {
                 header: 'Profile',
                 accessor: (row) => (
@@ -262,7 +421,7 @@ export function EmployeesPage() {
                         {row.first_name} {row.last_name}
                       </p>
                       <p className="truncate text-xs text-muted-foreground">
-                        {row.designations?.name ?? '—'}
+                        {[row.employee_code, row.designations?.name].filter(Boolean).join(' · ') || '—'}
                       </p>
                     </div>
                   </div>
@@ -271,36 +430,54 @@ export function EmployeesPage() {
               { header: 'Email', accessor: 'email' },
               { header: 'Department', accessor: (row) => row.departments?.name ?? '—' },
               { header: 'Shift', accessor: (row) => row.shifts?.name ?? '—' },
+              { header: 'Type', accessor: (row) => employmentTypeLabel(row.employment_type) },
+              {
+                header: 'App',
+                accessor: (row) => (
+                  <Badge variant={row.user_id ? 'info' : 'outline'}>
+                    {row.user_id ? 'Signed in' : 'Not signed in'}
+                  </Badge>
+                ),
+              },
               {
                 header: 'Status',
                 accessor: (row) => (
-                  <Badge variant={row.is_active ? 'success' : 'secondary'} dot>
-                    {row.is_active ? 'Active' : 'Inactive'}
+                  <Badge variant={row.archived_at ? 'outline' : row.is_active ? 'success' : 'secondary'} dot>
+                    {row.archived_at ? 'Archived' : row.is_active ? 'Active' : 'Inactive'}
                   </Badge>
                 ),
               },
               {
                 header: 'Actions',
-                accessor: (row) => (
+                accessor: (row) => canManage ? (
                   <div className="flex justify-end gap-1">
-                    <Button size="icon" variant="ghost" title="Site assignments" onClick={() => setSelectedEmployee(row)}>
-                      <MapPin className="h-4 w-4" />
-                    </Button>
-                    <Button size="icon" variant="ghost" title={row.is_active ? 'Deactivate' : 'Activate'} onClick={() => handleToggleActive(row)}>
-                      {row.is_active ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
-                    </Button>
-                    <Button size="icon" variant="ghost" title="Edit" onClick={() => handleEdit(row)}>
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button size="icon" variant="ghost" title="Delete" className="hover:text-destructive" onClick={() => handleDelete(row.id)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {row.archived_at ? (
+                      <Button size="icon" variant="ghost" title="Restore" aria-label={`Restore ${row.first_name} ${row.last_name}`} onClick={() => setArchiveTarget({ mode: 'restore', employees: [row] })}>
+                        <ArchiveRestore className="h-4 w-4" />
+                      </Button>
+                    ) : (
+                      <>
+                        <Button size="icon" variant="ghost" title="Site assignments" aria-label={`Site assignments for ${row.first_name} ${row.last_name}`} onClick={() => setSelectedEmployee(row)}>
+                          <MapPin className="h-4 w-4" />
+                        </Button>
+                        <Button size="icon" variant="ghost" title={row.is_active ? 'Deactivate' : 'Activate'} aria-label={`${row.is_active ? 'Deactivate' : 'Activate'} ${row.first_name} ${row.last_name}`} onClick={() => handleToggleActive(row)}>
+                          {row.is_active ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
+                        </Button>
+                        <Button size="icon" variant="ghost" title="Edit" aria-label={`Edit ${row.first_name} ${row.last_name}`} onClick={() => handleEdit(row)}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button size="icon" variant="ghost" title="Archive" aria-label={`Archive ${row.first_name} ${row.last_name}`} className="hover:text-destructive" onClick={() => setArchiveTarget({ mode: 'archive', employees: [row] })}>
+                          <Archive className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
                   </div>
-                ),
+                ) : null,
                 className: 'text-right',
               },
             ]}
             data={filteredEmployees}
+            emptyMessage={viewingArchived ? 'No archived employees' : 'No employees match these filters'}
           />
         </CardContent>
       </Card>
@@ -345,6 +522,7 @@ export function EmployeesPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
               />
+              <p className="text-xs text-muted-foreground">The employee signs in to the Crewtraxa app with this email.</p>
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
@@ -365,6 +543,39 @@ export function EmployeesPage() {
                 />
               </div>
             </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="employee_code">Employee Code</Label>
+                <Input
+                  id="employee_code"
+                  value={employeeCode}
+                  onChange={(e) => setEmployeeCode(e.target.value)}
+                  placeholder="e.g. EMP-014"
+                  aria-invalid={Boolean(codeError)}
+                  aria-describedby="employee_code_hint"
+                />
+                <p id="employee_code_hint" className={codeError ? 'text-xs text-destructive' : 'text-xs text-muted-foreground'}>
+                  {codeError ?? 'Optional. Unique within your organization.'}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="employment_type">Employment Type</Label>
+                <Select
+                  value={employmentType ?? 'none'}
+                  onValueChange={(value) => setEmploymentType(value === 'none' ? null : value)}
+                >
+                  <SelectTrigger id="employment_type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Not set</SelectItem>
+                    {EMPLOYMENT_TYPES.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="department_id">Department</Label>
@@ -372,7 +583,7 @@ export function EmployeesPage() {
                   value={departmentId ?? undefined}
                   onValueChange={setDepartmentId}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="department_id">
                     <SelectValue placeholder="Select department" />
                   </SelectTrigger>
                   <SelectContent>
@@ -388,7 +599,7 @@ export function EmployeesPage() {
                   value={designationId ?? undefined}
                   onValueChange={setDesignationId}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="designation_id">
                     <SelectValue placeholder="Select designation" />
                   </SelectTrigger>
                   <SelectContent>
@@ -404,7 +615,7 @@ export function EmployeesPage() {
                   value={shiftId ?? undefined}
                   onValueChange={setShiftId}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="shift_id">
                     <SelectValue placeholder="Select shift" />
                   </SelectTrigger>
                   <SelectContent>
@@ -422,7 +633,7 @@ export function EmployeesPage() {
             </Button>
             <Button
               onClick={() => mutation.mutate()}
-              disabled={mutation.isPending || !firstName || !lastName || !email}
+              disabled={mutation.isPending || !firstName.trim() || !lastName.trim() || !email.trim() || Boolean(codeError)}
             >
               {mutation.isPending ? 'Saving...' : 'Save Changes'}
             </Button>
@@ -436,6 +647,40 @@ export function EmployeesPage() {
           open={!!selectedEmployee}
           onOpenChange={() => setSelectedEmployee(null)}
           sites={sites}
+        />
+      )}
+
+      <EmployeeImportDialog
+        open={importOpen && canManage}
+        onOpenChange={setImportOpen}
+        employees={employees}
+        departments={departments}
+        designations={designations}
+        shifts={shifts}
+      />
+      <BulkEditDialog
+        ids={selectedEmployees.map((e) => e.id)}
+        open={bulkEditOpen}
+        onOpenChange={setBulkEditOpen}
+        onDone={clearSelection}
+        departments={departments}
+        designations={designations}
+        shifts={shifts}
+      />
+      <BulkAssignSiteDialog
+        ids={selectedEmployees.map((e) => e.id)}
+        open={bulkSiteOpen}
+        onOpenChange={setBulkSiteOpen}
+        onDone={clearSelection}
+        sites={sites}
+      />
+      {archiveTarget && (
+        <ArchiveDialog
+          mode={archiveTarget.mode}
+          employees={archiveTarget.employees}
+          open
+          onOpenChange={(open) => { if (!open) setArchiveTarget(null) }}
+          onDone={clearSelection}
         />
       )}
     </div>

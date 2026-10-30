@@ -27,6 +27,7 @@ import {
 } from 'lucide-react'
 import type { EmployeeWithRelations } from '@/api/services'
 import { useWorkforceTracking } from '@/api/useWorkforceTracking'
+import { OnboardingCard } from '@/features/onboarding/GettingStartedPage'
 
 function initials(first?: string | null, last?: string | null) {
   return `${first?.[0] ?? 'E'}${last?.[0] ?? ''}`.toUpperCase()
@@ -81,8 +82,10 @@ export function DashboardPage() {
   })
   const sites = useMemo(() => sitesQuery.data ?? [], [sitesQuery.data])
   const employees = useMemo(() => employeesQuery.data ?? [], [employeesQuery.data])
+  // Archived profiles keep their names for history, but are no longer part of the workforce.
+  const currentEmployees = useMemo(() => employees.filter((employee) => !employee.archived_at), [employees])
   const { counts: stats, snapshotQuery, assignmentsQuery } = useWorkforceTracking(
-    employees, sites, employeesQuery.isSuccess && sitesQuery.isSuccess,
+    currentEmployees, sites, employeesQuery.isSuccess && sitesQuery.isSuccess,
   )
   const activityQuery = useQuery({
     queryKey: ['recent-entry-exit-activity'],
@@ -157,13 +160,15 @@ export function DashboardPage() {
               <CalendarDays className="h-4 w-4" />
               {new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
             </Button>
-            <Button className="gap-2" onClick={() => exportEmployeesCsv(employees)}>
+            <Button className="gap-2" onClick={() => exportEmployeesCsv(currentEmployees)}>
               <Download className="h-4 w-4" />
               Export Report
             </Button>
           </>
         }
       />
+
+      <OnboardingCard />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard

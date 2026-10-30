@@ -307,5 +307,31 @@ const real = (await as(id.bEmp, () => q(`update presence_sessions set exit_times
 ok('real checkout replaces auto close', real.closed_by === 'employee' && real.total_hours === 3, JSON.stringify(real))
 ok('employees cannot run maintenance', await err(() => as(id.e1, () => q(`select mark_stale_sessions_exited(15)`))) === '42501')
 
+// T11 people management: employee codes, employment type, archive and restore
+const upd = (uid, set, empId) => as(uid, () => q(`update employees set ${set} where id=$1 returning *`, [empId]))
+ok('employee code set', await err(() => upd(id.m1, `employee_code='EMP-001', employment_type='contract'`, U(304))) === null)
+ok('employee code unique per org ignoring case', await err(() => upd(id.m1, `employee_code='emp-001'`, U(305))) === '23505')
+ok('same employee code allowed in another org', await err(() => upd(id.bAdmin, `employee_code='EMP-001'`, bEmp2Row.id)) === null)
+ok('malformed employee code rejected', await err(() => upd(id.m1, `employee_code=' bad code'`, U(305))) === '23514')
+ok('unknown employment type rejected', await err(() => upd(id.m1, `employment_type='freelance'`, U(305))) === '23514')
+ok('archived_by cannot be forged', (await upd(id.m1, `archived_by='${id.m2}'`, U(305)))[0].archived_by === null)
+const archived = (await upd(id.m1, `archived_at='2000-01-01'`, U(306)))[0]
+ok('archive stamps server time, actor and inactive', archived.archived_by === id.m1 && !archived.is_active
+  && new Date(archived.archived_at).getFullYear() > 2000, JSON.stringify(archived))
+ok('archived profile cannot be reactivated directly', await err(() => upd(id.m1, `is_active=true`, U(306))) === '22023')
+ok('archive record cannot be rewritten', (await upd(id.m1, `archived_at='2001-01-01', archived_by='${id.m2}'`, U(306)))[0].archived_by === id.m1)
+const restored = (await upd(id.m1, `archived_at=null, is_active=true`, U(306)))[0]
+ok('restore clears archive and reactivates', restored.archived_at === null && restored.archived_by === null && restored.is_active)
+ok('employees cannot be created archived', await err(() => as(id.m1, () => q(`insert into employees (first_name,last_name,email,archived_at) values ('a','b','arch@qvrix.test',now())`))) === '22023')
+await q(`insert into presence_sessions (user_id, site_id, entry_timestamp, organization_id) values ($1,$2,$3,$4)`, [id.e3, U(203), now - H, qvrix])
+ok('archive blocked while on site', await err(() => upd(id.m1, `archived_at=now()`, U(303))) === '22023')
+await q(`update presence_sessions set exit_timestamp=$1 where user_id=$2 and exit_timestamp is null`, [now, id.e3])
+ok('archive allowed after check-out', (await upd(id.m1, `archived_at=now()`, U(303)))[0]?.archived_by === id.m1)
+ok('archived employee still sees own profile, marked inactive', await n(id.e3, `select count(*)::int n from employees where not is_active and archived_at is not null`) === 1)
+ok('archived employee loses site access', await n(id.e3, `select count(*)::int n from sites`) === 0)
+ok('other org cannot archive', (await upd(id.bAdmin, `archived_at=now()`, U(305))).length === 0)
+ok('supervisor cannot archive', (await upd(id.aSup, `archived_at=now()`, U(305))).length === 0)
+ok('archive audited', (await q(`select count(*)::int n from audit_logs where table_name='employees' and record_id=$1 and new_values->>'archived_at' is not null`, [U(303)]))[0].n >= 1)
+
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

@@ -272,6 +272,10 @@ export interface Database {
           shift_id: string | null
           is_active: boolean
           hire_date: string | null
+          employee_code: string | null
+          employment_type: string | null
+          archived_at: string | null
+          archived_by: string | null
           created_at: string
           updated_at: string
         }
@@ -288,6 +292,10 @@ export interface Database {
           shift_id?: string | null
           is_active?: boolean
           hire_date?: string | null
+          employee_code?: string | null
+          employment_type?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -304,6 +312,10 @@ export interface Database {
           shift_id?: string | null
           is_active?: boolean
           hire_date?: string | null
+          employee_code?: string | null
+          employment_type?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
           created_at?: string
           updated_at?: string
         }
