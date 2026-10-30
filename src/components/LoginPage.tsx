@@ -103,7 +103,8 @@ export function LoginPage({ mode = 'login' }: { mode?: 'login' | 'forgot' | 'res
         setResetComplete(true)
         setPassword('')
         setConfirmPassword('')
-        setMessage('Your password has been updated. You can now sign in with your new password.')
+        // Employees reset from the Crewtraxa mobile app land here too; they sign in on the phone.
+        setMessage('Your password has been updated. Sign in with your new password on the Crewtraxa app or this dashboard.')
         await signOut()
         return
       }
