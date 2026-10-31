@@ -35,7 +35,13 @@ interface OrganizationContextValue {
   isPlatformAdmin: boolean
   canManage: boolean
   isOrgAdmin: boolean
+  /** The account may create its own organization (self-service setup). */
+  canCreateOrganization: boolean
   switchOrganization: (id: string) => void
+  /** Reloads Console access, e.g. after setup progress changes; resolves with the new access. */
+  refreshAccess: () => Promise<ConsoleAccess | undefined>
+  /** Reloads access and opens an organization the account has just been given, such as one it created. */
+  activateOrganization: (id: string) => Promise<void>
 }
 
 const OrganizationContext = createContext<OrganizationContextValue | undefined>(undefined)
@@ -71,6 +77,15 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     setStoredId(id)
   }, [access, queryClient])
 
+  const refreshAccess = useCallback(async () => (await accessQuery.refetch()).data, [accessQuery])
+
+  const activateOrganization = useCallback(async (id: string) => {
+    localStorage.setItem(ACTIVE_ORGANIZATION_KEY, id)
+    setStoredId(id)
+    setCurrentOrganizationId(id)
+    await accessQuery.refetch()
+  }, [accessQuery])
+
   const isPlatformAdmin = access?.is_platform_admin ?? false
   const role = organization?.role ?? null
 
@@ -86,7 +101,10 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         role,
         isPlatformAdmin,
         ...consoleCapabilities(role, isPlatformAdmin),
+        canCreateOrganization: access?.can_create_organization ?? false,
         switchOrganization,
+        refreshAccess,
+        activateOrganization,
       }}
     >
       {children}

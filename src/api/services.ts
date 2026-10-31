@@ -400,6 +400,15 @@ export async function assignEmployeesToSite(employeeIds: string[], siteId: strin
   return data.length
 }
 
+/** Adds employee profiles in one request, so the list is saved completely or not at all. Returns their ids. */
+export async function inviteEmployees(rows: Array<Pick<EmployeeInsert, 'first_name' | 'last_name' | 'email' | 'phone'>>): Promise<string[]> {
+  const { data, error } = await from('employees')
+    .insert(rows.map((row) => ({ ...row, organization_id: currentOrganizationId(), is_active: true })))
+    .select('id')
+  if (error) throw mutationError(error, 'add these employees')
+  return (data as Array<{ id: string }>).map((row) => row.id)
+}
+
 export interface EmployeeImportRow {
   first_name: string
   last_name: string

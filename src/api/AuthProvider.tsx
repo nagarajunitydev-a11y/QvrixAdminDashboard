@@ -10,6 +10,8 @@ interface AuthContextType {
   loading: boolean
   isPasswordRecovery: boolean
   signIn: (email: string, password: string) => Promise<Session | null>
+  /** Returns the session when no email confirmation is required, otherwise null. */
+  signUp: (email: string, password: string) => Promise<Session | null>
   signOut: () => Promise<void>
 }
 
@@ -63,6 +65,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return data.session
   }
 
+  const signUp = async (email: string, password: string): Promise<Session | null> => {
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+      options: { emailRedirectTo: new URL('/login', window.location.origin).href },
+    })
+    if (error) throw error
+    if (data.session) {
+      setSession(data.session)
+      setUser(data.session.user)
+      setLoading(false)
+    }
+    return data.session
+  }
+
   const signOut = async () => {
     const { error } = await supabase.auth.signOut()
     if (error) throw error
@@ -71,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ session, user, loading, isPasswordRecovery, signIn, signOut }}
+      value={{ session, user, loading, isPasswordRecovery, signIn, signUp, signOut }}
     >
       {children}
     </AuthContext.Provider>

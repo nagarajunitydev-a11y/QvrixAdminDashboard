@@ -7,6 +7,11 @@ export interface ConsoleOrganization {
   timezone: string
   is_active: boolean
   role: ConsoleRole
+  /** Absent before migration 20261031000003. */
+  country_code?: string | null
+  /** The next setup step for the organization's admins; 'done' once setup is finished or skipped. */
+  onboarding_step?: string
+  onboarding_completed_at?: string | null
 }
 
 /** An open Console-role invitation for the signed-in account's confirmed email. */
@@ -24,6 +29,19 @@ export interface ConsoleAccess {
   organizations: ConsoleOrganization[]
   /** Absent before migration 20261030000002. */
   invitations?: ConsoleInvitation[]
+  /** Whether this account may create its own organization (migration 20261031000003). */
+  can_create_organization?: boolean
+}
+
+/** Organization admins finish (or skip) setup before using the workspace; other roles never see it. */
+export function needsSetup(organization: ConsoleOrganization | null): boolean {
+  return Boolean(organization && organization.role === 'org_admin'
+    && organization.onboarding_step !== undefined && !organization.onboarding_completed_at)
+}
+
+/** Accounts may sign in to accept an invitation, create an organization, or use one they belong to. */
+export function canEnterConsole(access: ConsoleAccess | null | undefined): boolean {
+  return Boolean(access && (access.organizations.length || access.invitations?.length || access.can_create_organization))
 }
 
 export const roleLabels: Record<ConsoleRole, string> = {

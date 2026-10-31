@@ -13,6 +13,52 @@ import type {
 
 // Organizations and console members ------------------------------------------
 
+/** Self-service: creates an organization with the signed-in account as its admin. */
+export async function createMyOrganization(name: string, timezone: string, countryCode: string): Promise<string> {
+  const { data, error } = await supabase.rpc('create_my_organization', {
+    p_name: name,
+    p_timezone: timezone,
+    p_country_code: countryCode,
+  })
+  if (error) throw mutationError(error, 'create this organization')
+  return data as string
+}
+
+export interface OrganizationProfile {
+  id: string
+  name: string
+  timezone: string
+  country_code: string | null
+  industry: string | null
+  team_size: string | null
+  onboarding_step: string
+  onboarding_completed_at: string | null
+}
+
+export async function fetchOrganizationProfile(): Promise<OrganizationProfile> {
+  const { data, error } = await supabase.from('organizations')
+    .select('id, name, timezone, country_code, industry, team_size, onboarding_step, onboarding_completed_at')
+    .eq('id', currentOrganizationId())
+    .single()
+  if (error) throw error
+  return data as OrganizationProfile
+}
+
+export async function updateOrganizationSetup(
+  fields: Partial<Pick<OrganizationProfile, 'industry' | 'team_size' | 'country_code' | 'onboarding_step' | 'onboarding_completed_at'>>,
+): Promise<void> {
+  const { data, error } = await supabase.from('organizations').update(fields).eq('id', currentOrganizationId()).select('id')
+  if (error) throw mutationError(error, 'save the organization setup')
+  if (!data?.length) throw new Error('Only organization admins can change the organization setup.')
+}
+
+/** Employee profiles waiting for this account to accept them in the Crewtraxa app. */
+export async function fetchMyEmployeeInvitations(): Promise<Array<{ employee_id: string; organization_name: string }>> {
+  const { data, error } = await supabase.rpc('my_employee_invitations')
+  if (error) throw error
+  return data as Array<{ employee_id: string; organization_name: string }>
+}
+
 export async function createOrganization(input: {
   name: string
   slug: string

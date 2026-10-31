@@ -600,5 +600,55 @@ const istYesterday = new Date(Date.now() + 5.5 * H - 24 * H).toISOString().slice
 const live = Object.values(await sheet(id.m1, istYesterday, istToday, [U(301)])).find((d) => d.flags.includes('in_progress'))
 ok('a session in progress counts up to now', live && live.tracked_minutes >= 290 && live.tracked_minutes <= 310 && live.last_out === null, JSON.stringify(live))
 
+// T14 self-service organizations and setup progress
+const access = async (uid) => (await as(uid, () => q(`select public.my_console_access() a`)))[0].a
+const createOrg = (uid, name, tz = 'Asia/Kolkata', country = 'in') => as(uid, () => q(`select create_my_organization($1,$2,$3) id`, [name, tz, country]))
+ok('organizations that already existed are set up', (await q(`select onboarding_step, onboarding_completed_at is not null as done from organizations where id=$1`, [qvrix]))[0].done)
+ok('a platform-created organization starts setup', (await q(`select onboarding_step from organizations where id=$1`, [beta]))[0].onboarding_step === 'company')
+await db.query(`insert into auth.users (id,email,raw_app_meta_data,email_confirmed_at) values
+  ($1,'owner@acme.test','{}',now()), ($2,'pending@acme.test','{}',null), ($3,'second@acme.test','{}',now())`, [U(70), U(71), U(72)])
+ok('unconfirmed accounts cannot create an organization', (await access(U(71))).can_create_organization === false
+  && await err(() => createOrg(U(71), 'Pending Co')) === '42501')
+ok('a confirmed account without a role can', (await access(U(70))).can_create_organization === true)
+ok('members, employees and platform admins are not offered it', (await access(id.m1)).can_create_organization === false
+  && (await access(id.e1)).can_create_organization === false && (await access(U(60))).can_create_organization === false
+  && (await access(id.p1)).can_create_organization === false)
+ok('employees cannot create one', await err(() => createOrg(U(60), 'Side Business')) === '42501')
+ok('a former, archived employee can', (await access(id.e3)).can_create_organization === true)
+ok('a name is required', await err(() => createOrg(U(70), ' x ')) === '22023')
+ok('the time zone is checked', await err(() => createOrg(U(70), 'Acme Facilities', 'Mars/Base')) === '22023')
+const acme = (await createOrg(U(70), 'Acme Facilities'))[0].id
+const acmeRow = (await q(`select * from organizations where id=$1`, [acme]))[0]
+ok('creator becomes the admin of a new organization', acmeRow.slug === 'acme-facilities' && acmeRow.created_by === U(70)
+  && acmeRow.country_code === 'IN' && acmeRow.onboarding_step === 'company' && acmeRow.onboarding_completed_at === null
+  && (await q(`select role from organization_members where organization_id=$1 and user_id=$2`, [acme, U(70)]))[0]?.role === 'org_admin')
+const ownerAccess = await access(U(70))
+ok('access lists the new organization with its setup step', ownerAccess.organizations.length === 1
+  && ownerAccess.organizations[0].role === 'org_admin' && ownerAccess.organizations[0].onboarding_step === 'company'
+  && ownerAccess.can_create_organization === false, JSON.stringify(ownerAccess))
+ok('one organization per account', await err(() => createOrg(U(70), 'Acme Two')) === '42501')
+const twin = (await createOrg(U(72), 'Acme Facilities!'))[0].id
+ok('the same name gets its own identifier', /^acme-facilities-[0-9a-f]{5}$/.test((await q(`select slug from organizations where id=$1`, [twin]))[0].slug))
+const asOwner = (sql, params) => as(U(70), () => q(sql, params))
+ok('the admin saves company details and progress', await err(() => asOwner(`update organizations set industry='facility_management', team_size='11-50', onboarding_step='schedule' where id=$1`, [acme])) === null)
+ok('unknown industry rejected', await err(() => asOwner(`update organizations set industry='space' where id=$1`, [acme])) === '23514')
+ok('the creator cannot be rewritten', await err(() => asOwner(`update organizations set created_by=$2 where id=$1`, [acme, U(72)])) === '42501')
+ok('other organizations cannot change it', await n(id.m1, `with u as (update organizations set onboarding_step='done' where id='${acme}' returning 1) select count(*)::int n from u`) === 0)
+ok('other organizations cannot see it', await n(id.m1, `select count(*)::int n from organizations where id='${acme}'`) === 0)
+const acmeShift = (await asOwner(`insert into shifts (name, start_time, end_time, is_default) values ('General','09:00','18:00',true) returning organization_id`))[0]
+const acmeSite = (await asOwner(`insert into sites (name, latitude, longitude, radius_in_meters) values ('Acme HQ',12.9,77.6,300) returning organization_id`))[0]
+await asOwner(`insert into time_tracking_policies (auto_clock_out_after_minutes) values (720)`)
+await asOwner(`insert into employees (first_name, last_name, email) values ('Ravi','Kumar','ravi@acme.test')`)
+ok('setup records land in the new organization', acmeShift.organization_id === acme && acmeSite.organization_id === acme
+  && (await q(`select count(*)::int n from employees where organization_id=$1`, [acme]))[0].n === 1)
+ok('the invited employee sees the new organization by name', (await (async () => {
+  await db.query(`insert into auth.users (id,email,raw_app_meta_data,email_confirmed_at) values ($1,'ravi@acme.test','{}',now())`, [U(73)])
+  return (await as(U(73), () => q(`select organization_name from my_employee_invitations()`))).map((r) => r.organization_name)
+})()).includes('Acme Facilities'))
+ok('finishing setup', (await asOwner(`update organizations set onboarding_step='done', onboarding_completed_at=now() where id=$1 returning onboarding_completed_at`, [acme]))[0].onboarding_completed_at !== null)
+ok('creation audited in the new organization', (await q(`select count(*)::int n from audit_logs where table_name in ('organizations','organization_members') and organization_id=$1`, [acme]))[0].n >= 2)
+ok('anon cannot create organizations', await err(() => as(null, () => q(`select create_my_organization('Anon Co','Asia/Kolkata')`), 'anon')) === '42501')
+ok('the eligibility check is not callable directly', await err(() => as(U(72), () => q(`select can_create_organization()`))) === '42501')
+
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

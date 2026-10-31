@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../api/AuthProvider'
 import { consoleAccessKey, fetchConsoleAccess } from '../api/OrganizationProvider'
-import { consoleAccessErrorMessage, type ConsoleAccess } from '@/lib/consoleAccess'
+import { canEnterConsole, consoleAccessErrorMessage, type ConsoleAccess } from '@/lib/consoleAccess'
 import { queryClient } from '../api/queryClient'
 import { supabase } from '../api/supabase'
 import { Button } from './ui/button'
@@ -21,6 +21,7 @@ import {
   Radar,
   ShieldCheck,
   Sparkles,
+  UserPlus,
 } from 'lucide-react'
 
 const REMEMBER_KEY = 'mc-remembered-email'
@@ -43,7 +44,7 @@ const highlights = [
   },
 ]
 
-export function LoginPage({ mode = 'login' }: { mode?: 'login' | 'forgot' | 'reset' }) {
+export function LoginPage({ mode = 'login' }: { mode?: 'login' | 'forgot' | 'reset' | 'signup' }) {
   const [email, setEmail] = useState(() => localStorage.getItem(REMEMBER_KEY) ?? '')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -51,6 +52,7 @@ export function LoginPage({ mode = 'login' }: { mode?: 'login' | 'forgot' | 'res
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [resetComplete, setResetComplete] = useState(false)
+  const [signupSent, setSignupSent] = useState(false)
   const [recoveryError] = useState(() => {
     const hash = new URLSearchParams(window.location.hash.slice(1))
     const search = new URLSearchParams(window.location.search)
@@ -59,9 +61,11 @@ export function LoginPage({ mode = 'login' }: { mode?: 'login' | 'forgot' | 'res
   const [remember, setRemember] = useState(() => localStorage.getItem(REMEMBER_KEY) !== null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const { signIn, session, loading, isPasswordRecovery, signOut } = useAuth()
+  const { signIn, signUp, session, loading, isPasswordRecovery, signOut } = useAuth()
   const isReset = mode === 'reset'
   const isForgot = mode === 'forgot'
+  const isSignup = mode === 'signup'
+  const choosesPassword = isReset || isSignup
   const invalidReset = isReset && !loading && (!session || recoveryError) && !resetComplete
   const navigate = useNavigate()
   const location = useLocation()
@@ -95,6 +99,23 @@ export function LoginPage({ mode = 'login' }: { mode?: 'login' | 'forgot' | 'res
         setMessage('If an account exists for this email, you will receive a password reset link. Check your inbox and spam folder.')
         return
       }
+      if (isSignup) {
+        if (password !== confirmPassword) {
+          setError('Passwords do not match.')
+          return
+        }
+        const created = await signUp(email, password)
+        if (created) {
+          navigate('/setup', { replace: true })
+          return
+        }
+        setSignupSent(true)
+        setPassword('')
+        setConfirmPassword('')
+        // Worded the same whether or not the address already has an account, so it reveals nothing.
+        setMessage(`Check ${email.trim()} for a confirmation link. Open it, then sign in here to set up your organization. If you already have an account, sign in instead.`)
+        return
+      }
       if (isReset) {
         if (invalidReset || loading) return
         if (password !== confirmPassword) {
@@ -124,8 +145,8 @@ export function LoginPage({ mode = 'login' }: { mode?: 'login' | 'forgot' | 'res
         setError(consoleAccessErrorMessage(accessError))
         return
       }
-      // An account with only open invitations signs in to accept or decline them.
-      if (!access?.organizations.length && !access?.invitations?.length) {
+      // Accounts sign in to use an organization, answer an invitation, or create their own organization.
+      if (!canEnterConsole(access)) {
         await signOut()
         setError('This account has no Crewtraxa Console role. Field employees sign in on the Crewtraxa Employee app.')
         return
@@ -254,13 +275,13 @@ export function LoginPage({ mode = 'login' }: { mode?: 'login' | 'forgot' | 'res
           <div className="rounded-2xl border border-border/80 bg-card/95 p-6 shadow-premium backdrop-blur sm:p-8">
             <div className="mb-6">
               <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-inset ring-primary/15">
-                <KeyRound className="h-5 w-5" />
+                {isSignup ? <UserPlus className="h-5 w-5" /> : <KeyRound className="h-5 w-5" />}
               </div>
               <h2 className="font-headline text-headline-lg text-foreground">
-                {isForgot ? 'Forgot password?' : isReset ? 'Reset your password' : 'Welcome back'}
+                {isForgot ? 'Forgot password?' : isReset ? 'Reset your password' : isSignup ? 'Create your account' : 'Welcome back'}
               </h2>
               <p className="mt-1 text-body-sm text-muted-foreground">
-                {isForgot ? 'Enter your email address to receive a password reset link.' : isReset ? 'Choose a new password for your account.' : 'Sign in to the Crewtraxa manager console.'}
+                {isForgot ? 'Enter your email address to receive a password reset link.' : isReset ? 'Choose a new password for your account.' : isSignup ? 'Start a Crewtraxa workspace for your team. You will set up your organization next.' : 'Sign in to the Crewtraxa manager console.'}
               </p>
             </div>
 
@@ -282,7 +303,7 @@ export function LoginPage({ mode = 'login' }: { mode?: 'login' | 'forgot' | 'res
               )}
               {isReset && loading && <p role="status" className="text-body-sm text-muted-foreground">Checking your reset link...</p>}
 
-              {!isReset && (
+              {!isReset && !signupSent && (
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="email" className="text-label-md text-foreground">
                     Email address
@@ -304,13 +325,13 @@ export function LoginPage({ mode = 'login' }: { mode?: 'login' | 'forgot' | 'res
                 </div>
               )}
 
-              {!isForgot && !resetComplete && !invalidReset && (
+              {!isForgot && !resetComplete && !invalidReset && !signupSent && (
                 <div className="flex flex-col gap-1.5">
                   <div className="flex items-center justify-between">
                     <Label htmlFor="password" className="text-label-md text-foreground">
                       {isReset ? 'New password' : 'Password'}
                     </Label>
-                    {!isReset && <Link to="/forgot-password" className="text-xs text-primary hover:underline">Forgot password?</Link>}
+                    {!choosesPassword && <Link to="/forgot-password" className="text-xs text-primary hover:underline">Forgot password?</Link>}
                   </div>
                   <div className="relative">
                     <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -323,8 +344,8 @@ export function LoginPage({ mode = 'login' }: { mode?: 'login' | 'forgot' | 'res
                       onChange={(e) => setPassword(e.target.value)}
                       required
                       disabled={isLoading || (isReset && loading)}
-                      minLength={isReset ? 8 : undefined}
-                      autoComplete={isReset ? 'new-password' : 'current-password'}
+                      minLength={choosesPassword ? 8 : undefined}
+                      autoComplete={choosesPassword ? 'new-password' : 'current-password'}
                     />
                     <button
                       type="button"
@@ -340,9 +361,9 @@ export function LoginPage({ mode = 'login' }: { mode?: 'login' | 'forgot' | 'res
                   </div>
                 </div>
               )}
-              {isReset && !resetComplete && !invalidReset && (
+              {choosesPassword && !resetComplete && !invalidReset && !signupSent && (
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="confirm-password">Confirm new password</Label>
+                  <Label htmlFor="confirm-password">{isSignup ? 'Confirm password' : 'Confirm new password'}</Label>
                   <div className="relative">
                     <Input
                       id="confirm-password"
@@ -371,7 +392,7 @@ export function LoginPage({ mode = 'login' }: { mode?: 'login' | 'forgot' | 'res
                 </div>
               )}
 
-              {!isForgot && !isReset && (
+              {!isForgot && !isReset && !isSignup && (
                 <label className="flex cursor-pointer select-none items-center gap-2">
                   <input
                     type="checkbox"
@@ -383,11 +404,21 @@ export function LoginPage({ mode = 'login' }: { mode?: 'login' | 'forgot' | 'res
                 </label>
               )}
 
-              {!resetComplete && !invalidReset && (
+              {!resetComplete && !invalidReset && !signupSent && (
                 <Button type="submit" className="mt-1 h-10 w-full" disabled={isLoading || (isReset && loading)}>
-                  <span>{isForgot ? (isLoading ? 'Sending link...' : 'Send reset link') : isReset ? (isLoading ? 'Updating password...' : 'Update password') : (isLoading ? 'Signing in…' : 'Sign in')}</span>
+                  <span>{isForgot ? (isLoading ? 'Sending link...' : 'Send reset link') : isReset ? (isLoading ? 'Updating password...' : 'Update password') : isSignup ? (isLoading ? 'Creating account…' : 'Create account') : (isLoading ? 'Signing in…' : 'Sign in')}</span>
                   {!isLoading && <ArrowRight className="h-4 w-4" />}
                 </Button>
+              )}
+              {mode === 'login' && (
+                <p className="text-center text-body-sm text-muted-foreground">
+                  New to Crewtraxa? <Link to="/signup" className="font-semibold text-primary hover:underline">Create an account</Link>
+                </p>
+              )}
+              {isSignup && (
+                <p className="text-center text-body-sm text-muted-foreground">
+                  Already have an account? <Link to="/login" className="font-semibold text-primary hover:underline">Sign in</Link>
+                </p>
               )}
               {(isForgot || isReset) && (
                 <div className="flex flex-col items-center gap-3 text-body-sm">
@@ -399,7 +430,7 @@ export function LoginPage({ mode = 'login' }: { mode?: 'login' | 'forgot' | 'res
 
             <div className="mt-5 flex items-center gap-2 border-t border-border/60 pt-4 text-[11px] text-muted-foreground">
               <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
-              Organization role required. Access is checked after authentication.
+              {isSignup ? 'Field employees do not need an account here; they sign in on the Crewtraxa Employee app.' : 'Organization role required. Access is checked after authentication.'}
             </div>
           </div>
 

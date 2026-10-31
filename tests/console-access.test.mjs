@@ -7,9 +7,11 @@ const source = ts.transpileModule(readFileSync(new URL('../src/lib/consoleAccess
   compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.ESNext },
 }).outputText
 const {
+  canEnterConsole,
   consoleAccessErrorMessage,
   consoleCapabilities,
   deviceHolderLabel,
+  needsSetup,
   resolveActiveOrganization,
   unlinkedAccountLabel,
 } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'))
@@ -67,4 +69,23 @@ test('a device names its holder only through a verified employee link', () => {
   assert.deepEqual(deviceHolderLabel({ employee_id: null, user_id: 'user-2' }, names, emails), { label: 'Unlinked account · new@site.test', verified: false })
   assert.deepEqual(deviceHolderLabel({ employee_id: 'gone', user_id: '39235d6e-0000' }, names, emails), { label: 'Unlinked account', verified: false })
   assert.deepEqual(deviceHolderLabel({ employee_id: null, user_id: null }, names, emails), { label: 'No holder', verified: false })
+})
+
+test('only organization admins with unfinished setup are sent to the setup wizard', () => {
+  const org = (changes) => ({ id: 'a', name: 'A', slug: 'a', timezone: 'Asia/Kolkata', is_active: true, role: 'org_admin',
+    onboarding_step: 'schedule', onboarding_completed_at: null, ...changes })
+  assert.equal(needsSetup(org()), true)
+  assert.equal(needsSetup(org({ onboarding_completed_at: '2026-10-31T00:00:00Z', onboarding_step: 'done' })), false)
+  assert.equal(needsSetup(org({ role: 'manager' })), false)
+  assert.equal(needsSetup(org({ role: 'platform_admin' })), false)
+  // A server without the setup fields never forces the wizard.
+  assert.equal(needsSetup(org({ onboarding_step: undefined, onboarding_completed_at: undefined })), false)
+  assert.equal(needsSetup(null), false)
+})
+
+test('accounts enter the Console to use, accept or create an organization', () => {
+  assert.equal(canEnterConsole({ is_platform_admin: false, organizations: [], invitations: [], can_create_organization: true }), true)
+  assert.equal(canEnterConsole({ is_platform_admin: false, organizations: [], invitations: [{ id: 'i' }] }), true)
+  assert.equal(canEnterConsole({ is_platform_admin: false, organizations: [], invitations: [], can_create_organization: false }), false)
+  assert.equal(canEnterConsole(null), false)
 })

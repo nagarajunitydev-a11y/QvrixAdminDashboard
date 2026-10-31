@@ -32,6 +32,7 @@ import { GettingStartedPage } from './features/onboarding/GettingStartedPage'
 import { HolidaysPage } from './features/holidays/HolidaysPage'
 import { TimePolicyPage } from './features/time-policy/TimePolicyPage'
 import { TimesheetsPage } from './features/timesheets/TimesheetsPage'
+import { SetupWizardPage } from './features/setup/SetupWizardPage'
 
 function App() {
   return (
@@ -43,9 +44,11 @@ function App() {
               <BrowserRouter>
                 <Routes>
                   <Route path="/login" element={<LoginPage key="login" />} />
+                  <Route path="/signup" element={<LoginPage key="signup" mode="signup" />} />
                   <Route path="/forgot-password" element={<LoginPage key="forgot" mode="forgot" />} />
                   <Route path="/reset-password" element={<LoginPage key="reset" mode="reset" />} />
                   <Route element={<ProtectedRoute />}>
+                    <Route path="/setup" element={<SetupWizardPage />} />
                     <Route element={<ManagerLayout />}>
                       <Route path="/" element={<DashboardPage />} />
                       <Route path="/getting-started" element={<GettingStartedPage />} />
