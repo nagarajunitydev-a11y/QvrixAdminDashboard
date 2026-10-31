@@ -1,243 +1,212 @@
-import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import {
-  fetchDepartments,
-  fetchShifts,
-  createShift,
-  updateShift,
-  deleteShift,
-} from '@/api/services'
-import { Shift, ShiftInsert, ShiftUpdate } from '@/types'
+import { useMemo, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { CalendarClock, Edit, Plus, Star, Trash2 } from 'lucide-react'
+import { deleteShift, fetchDepartments, fetchEmployees, fetchShifts, updateShift } from '@/api/services'
+import { useOrganization } from '@/api/OrganizationProvider'
+import type { Shift } from '@/types'
 import { DataTable } from '@/components/ui/data-table'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PageHeader } from '@/components/ui/page-header'
-import { PageSkeleton } from '@/components/ui/states'
-import { Clock3, Plus, Edit, Trash2 } from 'lucide-react'
-import { format } from 'date-fns'
+import { EmptyState, PageSkeleton } from '@/components/ui/states'
+import { useToast } from '@/components/ui/toast'
+import { scheduleSummary } from '@/lib/workSchedules'
+import { WorkScheduleDialog } from './WorkScheduleDialog'
+
+const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`
 
 export function ShiftsPage() {
   const queryClient = useQueryClient()
-  const { data: shifts = [], isLoading } = useQuery({
-    queryKey: ['shifts'],
-    queryFn: fetchShifts,
-  })
-  const { data: departments = [] } = useQuery({
-    queryKey: ['departments'],
-    queryFn: fetchDepartments,
-  })
-  const [editing, setEditing] = useState<Shift | null>(null)
-  const [isFormOpen, setIsFormOpen] = useState(false)
-  const [name, setName] = useState('')
-  const [startTime, setStartTime] = useState('')
-  const [endTime, setEndTime] = useState('')
-  const [departmentId, setDepartmentId] = useState<string | null>(null)
+  const { toast } = useToast()
+  const { canManage } = useOrganization()
+  const { data: shifts = [], isLoading } = useQuery({ queryKey: ['shifts'], queryFn: fetchShifts })
+  const { data: departments = [] } = useQuery({ queryKey: ['departments'], queryFn: fetchDepartments })
+  const { data: employees = [] } = useQuery({ queryKey: ['employees'], queryFn: fetchEmployees })
+  // A new key per opening resets the form to the record being edited.
+  const [dialog, setDialog] = useState<{ key: number; schedule: Shift | null } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const mutation = useMutation({
-    mutationFn: async () => {
-      const payload: ShiftInsert = {
-        name,
-        start_time: startTime,
-        end_time: endTime,
-        department_id: departmentId ?? null,
-      }
-      if (editing) {
-        await updateShift(editing.id, payload as ShiftUpdate)
-      } else {
-        await createShift(payload)
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['shifts'] })
-      setIsFormOpen(false)
-      setEditing(null)
-      setName('')
-      setStartTime('')
-      setEndTime('')
-      setDepartmentId(null)
+  const usage = useMemo(() => {
+    const byShift = new Map<string, { employees: number; departments: string[] }>()
+    const entry = (id: string) => byShift.get(id) ?? byShift.set(id, { employees: 0, departments: [] }).get(id)!
+    for (const employee of employees) {
+      if (employee.shift_id && !employee.archived_at) entry(employee.shift_id).employees++
+    }
+    for (const department of departments) {
+      if (department.shift_id) entry(department.shift_id).departments.push(department.name)
+    }
+    return byShift
+  }, [employees, departments])
+
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['shifts'] })
+    queryClient.invalidateQueries({ queryKey: ['onboarding-counts'] })
+  }
+
+  const makeDefault = useMutation({
+    mutationFn: (schedule: Shift) => updateShift(schedule.id, { is_default: true }),
+    onSuccess: (saved) => {
       setError(null)
+      refresh()
+      toast({ title: `${saved.name} is now the organization default`, variant: 'success' })
     },
-    onError: (err) => {
-      setError(err instanceof Error ? err.message : 'Failed to save shift')
-    },
+    onError: (err) => setError(err instanceof Error ? err.message : 'Could not change the default schedule.'),
   })
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Delete this shift?')) return
+  const remove = async (schedule: Shift) => {
+    const used = usage.get(schedule.id)
+    if (used && (used.employees || used.departments.length)) {
+      setError(`${schedule.name} is still used by ${[
+        used.employees ? plural(used.employees, 'employee') : '',
+        used.departments.length ? `the ${used.departments.join(', ')} department${used.departments.length === 1 ? '' : 's'}` : '',
+      ].filter(Boolean).join(' and ')}. Move them to another schedule first.`)
+      return
+    }
+    if (!confirm(`Delete the ${schedule.name} schedule?`)) return
     try {
-      await deleteShift(id)
+      await deleteShift(schedule.id)
       setError(null)
-      queryClient.invalidateQueries({ queryKey: ['shifts'] })
+      refresh()
+      toast({ title: `Deleted ${schedule.name}`, variant: 'success' })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete shift')
+      setError(err instanceof Error ? err.message : 'Failed to delete the schedule.')
     }
   }
 
-  const handleEdit = (s: Shift) => {
-    setEditing(s)
-    setName(s.name)
-    setStartTime(s.start_time)
-    setEndTime(s.end_time)
-    setDepartmentId(s.department_id ?? null)
-    setError(null)
-    setIsFormOpen(true)
-  }
+  if (isLoading) return <PageSkeleton cards={0} rows={5} />
 
-  const handleAdd = () => {
-    setEditing(null)
-    setName('')
-    setStartTime('')
-    setEndTime('')
-    setDepartmentId(null)
-    setError(null)
-    setIsFormOpen(true)
-  }
-
-  const handleCloseForm = () => {
-    setIsFormOpen(false)
-    setError(null)
-  }
-
-  if (isLoading) {
-    return <PageSkeleton cards={0} rows={5} />
-  }
+  const fallback = shifts.find((shift) => shift.is_default)
 
   return (
     <div className="page-shell">
       <PageHeader
         eyebrow="Scheduling"
-        title="Shifts"
-        description="Configure working hours and assign them to departments."
-        icon={Clock3}
-        actions={
-          <Button onClick={handleAdd} className="shrink-0 gap-2">
+        title="Work Schedules"
+        description="Working days, hours, breaks and overtime. Each employee follows their own schedule, otherwise their department's, otherwise the organization default."
+        icon={CalendarClock}
+        actions={canManage && (
+          <Button onClick={() => setDialog({ key: Date.now(), schedule: null })} className="shrink-0 gap-2">
             <Plus className="h-4 w-4" />
-            Add Shift
+            New schedule
           </Button>
-        }
+        )}
       />
 
-      {error && !isFormOpen && (
+      {error && (
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
+      {shifts.length > 0 && !fallback && (
+        <Alert>
+          <AlertDescription>
+            No organization default is set, so employees without a schedule of their own or from their department have
+            no planned hours. Choose one with the star button.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <Card>
         <CardHeader>
-          <CardTitle>Shifts</CardTitle>
-          <CardDescription>{shifts.length} total shifts</CardDescription>
+          <CardTitle>Schedules</CardTitle>
+          <CardDescription>
+            {plural(shifts.length, 'schedule')}. The Android app shows each employee's start and end times today; it applies breaks and the
+            time-tracking policy after its next update, and timesheets will use the rest.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <DataTable
+            emptyState={(
+              <EmptyState
+                icon={CalendarClock}
+                title="No work schedules yet"
+                description="Create the schedules your people work, so attendance can be compared with planned hours."
+                action={canManage && (
+                  <Button onClick={() => setDialog({ key: Date.now(), schedule: null })} className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    New schedule
+                  </Button>
+                )}
+              />
+            )}
             columns={[
-              { header: 'Name', accessor: 'name' },
               {
                 header: 'Schedule',
                 accessor: (row) => (
-                  <span className="font-label text-label-md text-foreground">
-                    {format(new Date('2000-01-01T' + row.start_time), 'HH:mm')} – {format(new Date('2000-01-01T' + row.end_time), 'HH:mm')}
-                  </span>
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-foreground">{row.name}</span>
+                      {row.is_default && <Badge variant="info">Default</Badge>}
+                    </div>
+                    <span className="text-label-sm text-muted-foreground">{row.summary.type} · {row.summary.days}</span>
+                  </div>
                 ),
               },
-              { header: 'Department', accessor: (row) => row.departments?.name ?? '—' },
-              { header: 'Actions', accessor: (row) => row.actions, className: 'text-right' },
+              {
+                header: 'Hours',
+                accessor: (row) => (
+                  <div className="space-y-0.5">
+                    <span className="font-label text-label-md text-foreground">{row.summary.hours}</span>
+                    {row.summary.weekly !== '—' && <span className="block text-label-sm text-muted-foreground">{row.summary.weekly}</span>}
+                  </div>
+                ),
+              },
+              { header: 'Breaks', accessor: (row) => <span className="text-body-sm">{row.summary.breaks}</span> },
+              { header: 'Overtime', accessor: (row) => <span className="text-body-sm">{row.summary.overtime}</span> },
+              {
+                header: 'Used by',
+                accessor: (row) => {
+                  const used = usage.get(row.id)
+                  const parts = [
+                    used?.employees ? plural(used.employees, 'employee') : '',
+                    used?.departments.length ? used.departments.join(', ') : '',
+                  ].filter(Boolean)
+                  return <span className="text-body-sm">{parts.length ? parts.join(' · ') : row.is_default ? 'Everyone else' : '—'}</span>
+                },
+              },
+              ...(canManage ? [{
+                header: 'Actions',
+                className: 'text-right',
+                accessor: (row: Shift) => (
+                  <div className="flex justify-end gap-1">
+                    {!row.is_default && (
+                      <Button size="icon" variant="ghost" title="Make organization default" disabled={makeDefault.isPending}
+                        onClick={() => makeDefault.mutate(row)}>
+                        <Star className="h-4 w-4" />
+                      </Button>
+                    )}
+                    <Button size="icon" variant="ghost" title="Edit" onClick={() => setDialog({ key: Date.now(), schedule: row })}>
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button size="icon" variant="ghost" title="Delete" className="hover:text-destructive" onClick={() => remove(row)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ),
+              }] : []),
             ]}
-            data={shifts.map((s) => ({
-              ...s,
-              actions: (
-                <div className="flex justify-end gap-1">
-                  <Button size="icon" variant="ghost" title="Edit" onClick={() => handleEdit(s)}>
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button size="icon" variant="ghost" title="Delete" className="hover:text-destructive" onClick={() => handleDelete(s.id)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ),
-            }))}
+            data={shifts.map((shift) => ({ ...shift, summary: scheduleSummary(shift) }))}
           />
         </CardContent>
       </Card>
 
-      <Dialog open={isFormOpen} onOpenChange={(open) => (open ? setIsFormOpen(true) : handleCloseForm())}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editing ? 'Edit' : 'Add'} Shift</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="name">Shift Name *</Label>
-              <Input
-                id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="start_time">Start Time *</Label>
-                <Input
-                  id="start_time"
-                  type="time"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="end_time">End Time *</Label>
-                <Input
-                  id="end_time"
-                  type="time"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="department_id">Department</Label>
-              <Select
-                value={departmentId ?? undefined}
-                onValueChange={setDepartmentId}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select department" />
-                </SelectTrigger>
-                <SelectContent>
-                  {departments.map((d) => (
-                    <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={handleCloseForm} disabled={mutation.isPending}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => mutation.mutate()}
-              disabled={mutation.isPending || !name || !startTime || !endTime}
-            >
-              {mutation.isPending ? 'Saving...' : 'Save'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {dialog && (
+        <WorkScheduleDialog
+          key={dialog.key}
+          open
+          schedule={dialog.schedule}
+          onClose={() => setDialog(null)}
+          onSaved={(saved) => {
+            setDialog(null)
+            setError(null)
+            refresh()
+            toast({ title: `Saved ${saved.name}`, variant: 'success' })
+          }}
+        />
+      )}
     </div>
   )
 }

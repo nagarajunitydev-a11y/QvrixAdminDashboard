@@ -20,6 +20,9 @@ import type {
   EmployeeUpdate,
   EmployeeSite,
   EmployeeSiteInsert,
+  HolidayCalendar,
+  Holiday,
+  TimeTrackingPolicy,
   AuditLog,
 } from '../types'
 
@@ -27,10 +30,6 @@ export type EmployeeWithRelations = Employee & {
   departments: Pick<Department, 'name'> | null
   designations: Pick<Designation, 'name'> | null
   shifts: Pick<Shift, 'name'> | null
-}
-
-export type ShiftWithDepartment = Shift & {
-  departments: Pick<Department, 'name'> | null
 }
 
 export type EmployeeSiteWithSite = EmployeeSite & {
@@ -209,10 +208,10 @@ export async function deleteDesignation(id: string): Promise<void> {
   await deleteRecord('designations', id, 'designation')
 }
 
-// Shifts
-export async function fetchShifts(): Promise<ShiftWithDepartment[]> {
+// Work schedules (stored in shifts)
+export async function fetchShifts(): Promise<Shift[]> {
   const { data, error } = await from('shifts')
-    .select('*, departments(name)')
+    .select('*')
     .eq('organization_id', currentOrganizationId())
     .order('name')
   if (error) throw error
@@ -221,7 +220,7 @@ export async function fetchShifts(): Promise<ShiftWithDepartment[]> {
 
 export async function createShift(payload: ShiftInsert): Promise<Shift> {
   const { data, error } = await from('shifts').insert({ ...payload, organization_id: currentOrganizationId() }).select().single()
-  if (error) throw error
+  if (error) throw mutationError(error, 'create this work schedule')
   return data
 }
 
@@ -231,12 +230,95 @@ export async function updateShift(id: string, payload: ShiftUpdate): Promise<Shi
     .eq('id', id)
     .select()
     .single()
-  if (error) throw error
+  if (error) throw mutationError(error, 'save this work schedule')
   return data
 }
 
 export async function deleteShift(id: string): Promise<void> {
-  await deleteRecord('shifts', id, 'shift')
+  await deleteRecord('shifts', id, 'work schedule')
+}
+
+// Holiday calendars
+export async function fetchHolidayCalendars(): Promise<HolidayCalendar[]> {
+  const { data, error } = await from('holiday_calendars').select('*')
+    .eq('organization_id', currentOrganizationId()).order('name')
+  if (error) throw error
+  return data
+}
+
+export async function saveHolidayCalendar(id: string | null, payload: Pick<HolidayCalendar, 'name' | 'is_default'>): Promise<HolidayCalendar> {
+  const query = id
+    ? from('holiday_calendars').update(payload).eq('id', id)
+    : from('holiday_calendars').insert({ ...payload, organization_id: currentOrganizationId() })
+  const { data, error } = await query.select().single()
+  if (error) throw mutationError(error, 'save this holiday calendar')
+  return data
+}
+
+export async function deleteHolidayCalendar(id: string): Promise<void> {
+  await deleteRecord('holiday_calendars', id, 'holiday calendar')
+}
+
+export async function fetchHolidays(calendarId: string): Promise<Holiday[]> {
+  const { data, error } = await from('holidays').select('*')
+    .eq('organization_id', currentOrganizationId())
+    .eq('calendar_id', calendarId)
+    .order('holiday_date')
+  if (error) throw error
+  return data
+}
+
+/** Adds every holiday in one request, so a list is saved completely or not at all. */
+export async function addHolidays(calendarId: string, holidays: Array<{ date: string; name: string }>): Promise<number> {
+  const { data, error } = await from('holidays')
+    .insert(holidays.map(({ date, name }) => ({
+      calendar_id: calendarId,
+      holiday_date: date,
+      name,
+      organization_id: currentOrganizationId(),
+    })))
+    .select('id')
+  if (error) throw mutationError(error, 'add these holidays')
+  return data.length
+}
+
+export async function updateHoliday(id: string, payload: Pick<Holiday, 'holiday_date' | 'name'>): Promise<void> {
+  const { data, error } = await from('holidays').update(payload).eq('id', id).select('id')
+  if (error) throw mutationError(error, 'save this holiday')
+  if (!data?.length) throw new Error('The holiday was not saved. It may have been removed, or your role cannot edit holidays.')
+}
+
+export async function deleteHoliday(id: string): Promise<void> {
+  await deleteRecord('holidays', id, 'holiday')
+}
+
+// Time-tracking policy: one for the organization, optionally replaced per department
+export type TimeTrackingPolicyFields = Pick<TimeTrackingPolicy,
+  'require_inside_site' | 'lock_to_registered_device' | 'early_clock_in_minutes' | 'block_outside_schedule'
+  | 'auto_clock_out_after_minutes' | 'auto_clock_out_at'>
+
+export async function fetchTimeTrackingPolicies(): Promise<TimeTrackingPolicy[]> {
+  const { data, error } = await from('time_tracking_policies').select('*')
+    .eq('organization_id', currentOrganizationId())
+  if (error) throw error
+  return data
+}
+
+export async function saveTimeTrackingPolicy(
+  id: string | null,
+  departmentId: string | null,
+  fields: TimeTrackingPolicyFields,
+): Promise<TimeTrackingPolicy> {
+  const query = id
+    ? from('time_tracking_policies').update(fields).eq('id', id)
+    : from('time_tracking_policies').insert({ ...fields, department_id: departmentId, organization_id: currentOrganizationId() })
+  const { data, error } = await query.select().single()
+  if (error) throw mutationError(error, 'save the time-tracking policy')
+  return data
+}
+
+export async function deleteTimeTrackingPolicy(id: string): Promise<void> {
+  await deleteRecord('time_tracking_policies', id, 'department policy')
 }
 
 // Employees
@@ -371,6 +453,7 @@ export interface OnboardingCounts {
   sites: number
   departments: number
   shifts: number
+  holidayCalendars: number
   employees: number
   assignments: number
   linkedEmployees: number
@@ -385,15 +468,16 @@ export async function fetchOnboardingCounts(): Promise<OnboardingCounts> {
     if (error) throw error
     return total ?? 0
   }
-  const [sites, departments, shifts, employees, assignments, linkedEmployees] = await Promise.all([
+  const [sites, departments, shifts, holidayCalendars, employees, assignments, linkedEmployees] = await Promise.all([
     count('sites'),
     count('departments'),
     count('shifts'),
+    count('holiday_calendars'),
     count('employees', (q) => q.is('archived_at', null)),
     count('employee_sites'),
     count('employees', (q) => q.is('archived_at', null).not('user_id', 'is', null)),
   ])
-  return { sites, departments, shifts, employees, assignments, linkedEmployees }
+  return { sites, departments, shifts, holidayCalendars, employees, assignments, linkedEmployees }
 }
 
 // Employee-Sites

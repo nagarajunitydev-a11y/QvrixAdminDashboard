@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { archiveEmployees, assignEmployeesToSite, restoreEmployees, updateEmployees } from '@/api/services'
-import type { Department, Designation, EmployeeUpdate, Shift, Site } from '@/types'
+import type { Department, Designation, EmployeeUpdate, HolidayCalendar, Shift, Site } from '@/types'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -68,6 +68,7 @@ export function BulkEditDialog({
   departments,
   designations,
   shifts,
+  holidayCalendars,
 }: {
   ids: string[]
   open: boolean
@@ -76,11 +77,13 @@ export function BulkEditDialog({
   departments: Department[]
   designations: Designation[]
   shifts: Shift[]
+  holidayCalendars: HolidayCalendar[]
 }) {
   const { toast } = useToast()
   const [department, setDepartment] = useState(NO_CHANGE)
   const [designation, setDesignation] = useState(NO_CHANGE)
   const [shift, setShift] = useState(NO_CHANGE)
+  const [calendar, setCalendar] = useState(NO_CHANGE)
   const [employmentType, setEmploymentType] = useState(NO_CHANGE)
   const [status, setStatus] = useState(NO_CHANGE)
 
@@ -89,6 +92,7 @@ export function BulkEditDialog({
   if (department !== NO_CHANGE) payload.department_id = pick(department)
   if (designation !== NO_CHANGE) payload.designation_id = pick(designation)
   if (shift !== NO_CHANGE) payload.shift_id = pick(shift)
+  if (calendar !== NO_CHANGE) payload.holiday_calendar_id = pick(calendar)
   if (employmentType !== NO_CHANGE) payload.employment_type = pick(employmentType)
   if (status !== NO_CHANGE) payload.is_active = status === 'active'
   const changes = Object.keys(payload).length
@@ -97,6 +101,7 @@ export function BulkEditDialog({
     setDepartment(NO_CHANGE)
     setDesignation(NO_CHANGE)
     setShift(NO_CHANGE)
+    setCalendar(NO_CHANGE)
     setEmploymentType(NO_CHANGE)
     setStatus(NO_CHANGE)
   }
@@ -131,8 +136,10 @@ export function BulkEditDialog({
               options={departments.map((d) => ({ value: d.id, label: d.name }))} />
             <ChangeSelect id="bulk-designation" label="Designation" value={designation} onChange={setDesignation}
               options={designations.map((d) => ({ value: d.id, label: d.name }))} />
-            <ChangeSelect id="bulk-shift" label="Shift" value={shift} onChange={setShift}
+            <ChangeSelect id="bulk-shift" label="Work schedule" value={shift} onChange={setShift}
               options={shifts.map((s) => ({ value: s.id, label: s.name }))} />
+            <ChangeSelect id="bulk-calendar" label="Holiday calendar" value={calendar} onChange={setCalendar}
+              options={holidayCalendars.map((c) => ({ value: c.id, label: c.name }))} />
             <ChangeSelect id="bulk-type" label="Employment type" value={employmentType} onChange={setEmploymentType}
               options={EMPLOYMENT_TYPES.map((t) => ({ value: t.value, label: t.label }))} />
             <ChangeSelect id="bulk-status" label="Status" value={status} onChange={setStatus} clearable={false}

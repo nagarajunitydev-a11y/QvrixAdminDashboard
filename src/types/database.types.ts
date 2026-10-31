@@ -180,6 +180,8 @@ export interface Database {
           id: string
           name: string
           description: string | null
+          shift_id: string | null
+          holiday_calendar_id: string | null
           created_at: string
           updated_at: string
         }
@@ -188,6 +190,8 @@ export interface Database {
           id?: string
           name: string
           description?: string | null
+          shift_id?: string | null
+          holiday_calendar_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -196,6 +200,8 @@ export interface Database {
           id?: string
           name?: string
           description?: string | null
+          shift_id?: string | null
+          holiday_calendar_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -233,6 +239,25 @@ export interface Database {
           name: string
           start_time: string
           end_time: string
+          schedule_type: 'fixed' | 'flexible' | 'weekly_flexible'
+          working_days: number[]
+          day_times: Record<string, { start: string; end: string }>
+          daily_minutes: number | null
+          weekly_minutes: number | null
+          breaks: Array<{ name: string; minutes: number; paid: boolean; start?: string; end?: string }>
+          auto_break_minutes: number | null
+          auto_break_after_minutes: number | null
+          day_split_time: string
+          overtime_daily_after_minutes: number | null
+          overtime_daily_rate: number | null
+          overtime_double_after_minutes: number | null
+          overtime_double_rate: number | null
+          overtime_weekly_after_minutes: number | null
+          overtime_weekly_rate: number | null
+          overtime_rest_day_rate: number | null
+          overtime_holiday_rate: number | null
+          is_default: boolean
+          /** Superseded by departments.shift_id; no longer read or written. */
           department_id: string | null
           created_at: string
           updated_at: string
@@ -243,7 +268,24 @@ export interface Database {
           name: string
           start_time: string
           end_time: string
-          department_id?: string | null
+          schedule_type?: 'fixed' | 'flexible' | 'weekly_flexible'
+          working_days?: number[]
+          day_times?: Record<string, { start: string; end: string }>
+          daily_minutes?: number | null
+          weekly_minutes?: number | null
+          breaks?: Array<{ name: string; minutes: number; paid: boolean; start?: string; end?: string }>
+          auto_break_minutes?: number | null
+          auto_break_after_minutes?: number | null
+          day_split_time?: string
+          overtime_daily_after_minutes?: number | null
+          overtime_daily_rate?: number | null
+          overtime_double_after_minutes?: number | null
+          overtime_double_rate?: number | null
+          overtime_weekly_after_minutes?: number | null
+          overtime_weekly_rate?: number | null
+          overtime_rest_day_rate?: number | null
+          overtime_holiday_rate?: number | null
+          is_default?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -253,7 +295,24 @@ export interface Database {
           name?: string
           start_time?: string
           end_time?: string
-          department_id?: string | null
+          schedule_type?: 'fixed' | 'flexible' | 'weekly_flexible'
+          working_days?: number[]
+          day_times?: Record<string, { start: string; end: string }>
+          daily_minutes?: number | null
+          weekly_minutes?: number | null
+          breaks?: Array<{ name: string; minutes: number; paid: boolean; start?: string; end?: string }>
+          auto_break_minutes?: number | null
+          auto_break_after_minutes?: number | null
+          day_split_time?: string
+          overtime_daily_after_minutes?: number | null
+          overtime_daily_rate?: number | null
+          overtime_double_after_minutes?: number | null
+          overtime_double_rate?: number | null
+          overtime_weekly_after_minutes?: number | null
+          overtime_weekly_rate?: number | null
+          overtime_rest_day_rate?: number | null
+          overtime_holiday_rate?: number | null
+          is_default?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -270,6 +329,7 @@ export interface Database {
           department_id: string | null
           designation_id: string | null
           shift_id: string | null
+          holiday_calendar_id: string | null
           is_active: boolean
           hire_date: string | null
           employee_code: string | null
@@ -290,6 +350,7 @@ export interface Database {
           department_id?: string | null
           designation_id?: string | null
           shift_id?: string | null
+          holiday_calendar_id?: string | null
           is_active?: boolean
           hire_date?: string | null
           employee_code?: string | null
@@ -310,12 +371,109 @@ export interface Database {
           department_id?: string | null
           designation_id?: string | null
           shift_id?: string | null
+          holiday_calendar_id?: string | null
           is_active?: boolean
           hire_date?: string | null
           employee_code?: string | null
           employment_type?: string | null
           archived_at?: string | null
           archived_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      holiday_calendars: {
+        Row: {
+          id: string
+          organization_id: string
+          name: string
+          is_default: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          organization_id?: string
+          name: string
+          is_default?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          name?: string
+          is_default?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      holidays: {
+        Row: {
+          id: string
+          organization_id: string
+          calendar_id: string
+          holiday_date: string
+          name: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          organization_id?: string
+          calendar_id: string
+          holiday_date: string
+          name: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          calendar_id?: string
+          holiday_date?: string
+          name?: string
+          created_at?: string
+        }
+      }
+      time_tracking_policies: {
+        Row: {
+          id: string
+          organization_id: string
+          department_id: string | null
+          require_inside_site: boolean
+          lock_to_registered_device: boolean
+          early_clock_in_minutes: number | null
+          block_outside_schedule: boolean
+          auto_clock_out_after_minutes: number | null
+          auto_clock_out_at: string | null
+          updated_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          organization_id?: string
+          department_id?: string | null
+          require_inside_site?: boolean
+          lock_to_registered_device?: boolean
+          early_clock_in_minutes?: number | null
+          block_outside_schedule?: boolean
+          auto_clock_out_after_minutes?: number | null
+          auto_clock_out_at?: string | null
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          department_id?: string | null
+          require_inside_site?: boolean
+          lock_to_registered_device?: boolean
+          early_clock_in_minutes?: number | null
+          block_outside_schedule?: boolean
+          auto_clock_out_after_minutes?: number | null
+          auto_clock_out_at?: string | null
+          updated_by?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -417,6 +575,15 @@ export type ShiftUpdate = Database['public']['Tables']['shifts']['Update']
 export type Employee = Database['public']['Tables']['employees']['Row']
 export type EmployeeInsert = Database['public']['Tables']['employees']['Insert']
 export type EmployeeUpdate = Database['public']['Tables']['employees']['Update']
+
+export type HolidayCalendar = Database['public']['Tables']['holiday_calendars']['Row']
+export type HolidayCalendarInsert = Database['public']['Tables']['holiday_calendars']['Insert']
+
+export type Holiday = Database['public']['Tables']['holidays']['Row']
+export type HolidayInsert = Database['public']['Tables']['holidays']['Insert']
+
+export type TimeTrackingPolicy = Database['public']['Tables']['time_tracking_policies']['Row']
+export type TimeTrackingPolicyInsert = Database['public']['Tables']['time_tracking_policies']['Insert']
 
 export type EmployeeSite = Database['public']['Tables']['employee_sites']['Row']
 export type EmployeeSiteInsert = Database['public']['Tables']['employee_sites']['Insert']

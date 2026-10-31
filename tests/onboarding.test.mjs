@@ -8,7 +8,7 @@ const source = ts.transpileModule(readFileSync(new URL('../src/lib/onboarding.ts
 }).outputText
 const { onboardingStatus } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'))
 
-const none = { sites: 0, departments: 0, shifts: 0, employees: 0, assignments: 0, linkedEmployees: 0 }
+const none = { sites: 0, departments: 0, shifts: 0, holidayCalendars: 0, employees: 0, assignments: 0, linkedEmployees: 0 }
 
 test('a new organization starts at zero with sites as the next step', () => {
   const status = onboardingStatus(none, 1)
@@ -24,6 +24,14 @@ test('optional departments never block completion or count toward progress', () 
   assert.equal(status.percent, 100)
   assert.equal(status.next, null)
   assert.equal(status.steps.find((step) => step.id === 'departments').done, false)
+  assert.equal(status.steps.find((step) => step.id === 'holidays').optional, true)
+})
+
+test('the holidays step completes once a calendar exists', () => {
+  const step = (counts) => onboardingStatus({ ...none, ...counts }, null).steps.find((s) => s.id === 'holidays')
+  assert.equal(step({}).done, false)
+  assert.equal(step({ holidayCalendars: 2 }).detail, '2 calendars')
+  assert.equal(step({ holidayCalendars: 1 }).done, true)
 })
 
 test('the team step appears only for viewers who can see the team', () => {

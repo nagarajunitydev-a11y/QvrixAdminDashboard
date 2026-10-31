@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   fetchDepartments,
+  fetchHolidayCalendars,
+  fetchShifts,
   createDepartment,
   updateDepartment,
   deleteDepartment,
@@ -14,10 +16,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PageHeader } from '@/components/ui/page-header'
 import { PageSkeleton } from '@/components/ui/states'
 import { Building2, Plus, Edit, Trash2 } from 'lucide-react'
+import { useOrganization } from '@/api/OrganizationProvider'
+
+// Radix Select cannot hold an empty value.
+const NONE = 'none'
 
 export function DepartmentsPage() {
   const queryClient = useQueryClient()
@@ -25,7 +32,13 @@ export function DepartmentsPage() {
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [shiftId, setShiftId] = useState(NONE)
+  const [calendarId, setCalendarId] = useState(NONE)
   const [error, setError] = useState<string | null>(null)
+  const { canManage } = useOrganization()
+  const { data: shifts = [] } = useQuery({ queryKey: ['shifts'], queryFn: fetchShifts })
+  const { data: calendars = [] } = useQuery({ queryKey: ['holiday-calendars'], queryFn: fetchHolidayCalendars })
+  const nameOf = (records: Array<{ id: string; name: string }>, id: string | null) => records.find((r) => r.id === id)?.name
 
   const { data: departments = [], isLoading } = useQuery({
     queryKey: ['departments'],
@@ -37,6 +50,8 @@ export function DepartmentsPage() {
       const payload: DepartmentInsert = {
         name,
         description: description || null,
+        shift_id: shiftId === NONE ? null : shiftId,
+        holiday_calendar_id: calendarId === NONE ? null : calendarId,
       }
       if (editing) {
         await updateDepartment(editing.id, payload as DepartmentUpdate)
@@ -50,6 +65,8 @@ export function DepartmentsPage() {
       setEditing(null)
       setName('')
       setDescription('')
+      setShiftId(NONE)
+      setCalendarId(NONE)
       setError(null)
     },
     onError: (err) => {
@@ -72,6 +89,8 @@ export function DepartmentsPage() {
     setEditing(dept)
     setName(dept.name)
     setDescription(dept.description ?? '')
+    setShiftId(dept.shift_id ?? NONE)
+    setCalendarId(dept.holiday_calendar_id ?? NONE)
     setError(null)
     setIsFormOpen(true)
   }
@@ -80,6 +99,8 @@ export function DepartmentsPage() {
     setEditing(null)
     setName('')
     setDescription('')
+    setShiftId(NONE)
+    setCalendarId(NONE)
     setError(null)
     setIsFormOpen(true)
   }
@@ -100,12 +121,12 @@ export function DepartmentsPage() {
         title="Departments"
         description="Structure the business into teams and reporting groups."
         icon={Building2}
-        actions={
+        actions={canManage && (
           <Button onClick={handleAdd} className="shrink-0 gap-2">
             <Plus className="h-4 w-4" />
             Add Department
           </Button>
-        }
+        )}
       />
 
       {error && !isFormOpen && (
@@ -124,7 +145,9 @@ export function DepartmentsPage() {
             columns={[
               { header: 'Name', accessor: 'name' },
               { header: 'Description', accessor: 'description' },
-              { header: 'Actions', accessor: (row) => row.actions, className: 'text-right' },
+              { header: 'Default schedule', accessor: (row) => nameOf(shifts, row.shift_id) ?? <span className="text-muted-foreground">Organization default</span> },
+              { header: 'Holiday calendar', accessor: (row) => nameOf(calendars, row.holiday_calendar_id) ?? <span className="text-muted-foreground">Organization default</span> },
+              ...(canManage ? [{ header: 'Actions', accessor: (row: { actions: ReactNode }) => row.actions, className: 'text-right' }] : []),
             ]}
             data={departments.map((d) => ({
               ...d,
@@ -171,6 +194,29 @@ export function DepartmentsPage() {
                 onChange={(e) => setDescription(e.target.value)}
               />
             </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="department-shift">Default schedule</Label>
+                <Select value={shiftId} onValueChange={setShiftId}>
+                  <SelectTrigger id="department-shift"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>Organization default</SelectItem>
+                    {shifts.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="department-calendar">Holiday calendar</Label>
+                <Select value={calendarId} onValueChange={setCalendarId}>
+                  <SelectTrigger id="department-calendar"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>Organization default</SelectItem>
+                    {calendars.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <p className="text-label-sm text-muted-foreground">Employees in this department use these unless their own profile sets a schedule or calendar.</p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={handleCloseForm} disabled={mutation.isPending}>

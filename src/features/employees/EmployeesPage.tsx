@@ -6,6 +6,7 @@ import {
   fetchDepartments,
   fetchDesignations,
   fetchShifts,
+  fetchHolidayCalendars,
   fetchSites,
   createEmployee,
   updateEmployee,
@@ -28,6 +29,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PageHeader } from '@/components/ui/page-header'
 import { PageSkeleton } from '@/components/ui/states'
 import { downloadCsv } from '@/lib/format'
+import { RULE_SOURCE_LABELS, resolveRule } from '@/lib/workSchedules'
 import { EMPLOYEE_CODE_PATTERN, EMPLOYMENT_TYPES, employmentTypeLabel } from '@/lib/employeeImport'
 import {
   Archive,
@@ -74,6 +76,9 @@ function exportEmployees(employees: EmployeeWithRelations[]) {
   )
 }
 
+// Radix Select cannot hold an empty value; this stands for "use the department or organization default".
+const INHERIT = 'inherit'
+
 export function EmployeesPage() {
   const queryClient = useQueryClient()
   const { canManage } = useOrganization()
@@ -93,6 +98,10 @@ export function EmployeesPage() {
   const { data: shifts = [] } = useQuery({
     queryKey: ['shifts'],
     queryFn: fetchShifts,
+  })
+  const { data: holidayCalendars = [] } = useQuery({
+    queryKey: ['holiday-calendars'],
+    queryFn: fetchHolidayCalendars,
   })
   const { data: sites = [] } = useQuery({
     queryKey: ['sites'],
@@ -123,6 +132,7 @@ export function EmployeesPage() {
   const [departmentId, setDepartmentId] = useState<string | null>(null)
   const [designationId, setDesignationId] = useState<string | null>(null)
   const [shiftId, setShiftId] = useState<string | null>(null)
+  const [holidayCalendarId, setHolidayCalendarId] = useState<string | null>(null)
   const [isActive, setIsActive] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -182,6 +192,7 @@ export function EmployeesPage() {
         department_id: departmentId ?? null,
         designation_id: designationId ?? null,
         shift_id: shiftId ?? null,
+        holiday_calendar_id: holidayCalendarId ?? null,
         is_active: isActive,
         hire_date: hireDate || null,
       }
@@ -215,6 +226,7 @@ export function EmployeesPage() {
     setDepartmentId(null)
     setDesignationId(null)
     setShiftId(null)
+    setHolidayCalendarId(null)
     setIsActive(true)
   }
 
@@ -230,6 +242,7 @@ export function EmployeesPage() {
     setDepartmentId(e.department_id ?? null)
     setDesignationId(e.designation_id ?? null)
     setShiftId(e.shift_id ?? null)
+    setHolidayCalendarId(e.holiday_calendar_id ?? null)
     setIsActive(e.is_active)
     setError(null)
     setIsFormOpen(true)
@@ -429,7 +442,22 @@ export function EmployeesPage() {
               },
               { header: 'Email', accessor: 'email' },
               { header: 'Department', accessor: (row) => row.departments?.name ?? '—' },
-              { header: 'Shift', accessor: (row) => row.shifts?.name ?? '—' },
+              {
+                header: 'Schedule',
+                accessor: (row) => {
+                  const department = departments.find((d) => d.id === row.department_id)
+                  const schedule = resolveRule(row.shift_id, department?.shift_id, shifts)
+                  if (!schedule) return <span className="text-muted-foreground">None</span>
+                  return (
+                    <span title={RULE_SOURCE_LABELS[schedule.source]}>
+                      {schedule.value.name}
+                      {schedule.source !== 'employee' && (
+                        <span className="ml-1 text-label-sm text-muted-foreground">{schedule.source === 'department' ? '(department)' : '(default)'}</span>
+                      )}
+                    </span>
+                  )
+                },
+              },
               { header: 'Type', accessor: (row) => employmentTypeLabel(row.employment_type) },
               {
                 header: 'App',
@@ -610,17 +638,35 @@ export function EmployeesPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="shift_id">Shift</Label>
+                <Label htmlFor="shift_id">Work schedule</Label>
                 <Select
-                  value={shiftId ?? undefined}
-                  onValueChange={setShiftId}
+                  value={shiftId ?? INHERIT}
+                  onValueChange={(value) => setShiftId(value === INHERIT ? null : value)}
                 >
                   <SelectTrigger id="shift_id">
-                    <SelectValue placeholder="Select shift" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value={INHERIT}>Department or organization default</SelectItem>
                     {shifts.map((s) => (
                       <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="holiday_calendar_id">Holiday calendar</Label>
+                <Select
+                  value={holidayCalendarId ?? INHERIT}
+                  onValueChange={(value) => setHolidayCalendarId(value === INHERIT ? null : value)}
+                >
+                  <SelectTrigger id="holiday_calendar_id">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={INHERIT}>Department or organization default</SelectItem>
+                    {holidayCalendars.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -666,6 +712,7 @@ export function EmployeesPage() {
         departments={departments}
         designations={designations}
         shifts={shifts}
+        holidayCalendars={holidayCalendars}
       />
       <BulkAssignSiteDialog
         ids={selectedEmployees.map((e) => e.id)}

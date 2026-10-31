@@ -4,13 +4,14 @@ export interface OnboardingCountsInput {
   sites: number
   departments: number
   shifts: number
+  holidayCalendars: number
   employees: number
   assignments: number
   linkedEmployees: number
 }
 
 export interface OnboardingStep {
-  id: 'sites' | 'departments' | 'shifts' | 'employees' | 'assignments' | 'app' | 'team'
+  id: 'sites' | 'departments' | 'shifts' | 'holidays' | 'employees' | 'assignments' | 'app' | 'team'
   title: string
   description: string
   detail: string
@@ -59,13 +60,23 @@ export function onboardingStatus(counts: OnboardingCountsInput, teamSize: number
     },
     {
       id: 'shifts',
-      title: 'Set working hours',
-      description: 'Create the shifts people work, so attendance can be compared with planned hours.',
-      detail: counts.shifts ? `${plural(counts.shifts, 'shift')}` : 'No shifts yet',
+      title: 'Set work schedules',
+      description: 'Create the schedules people work (days, hours, breaks and overtime), so attendance can be compared with planned hours.',
+      detail: counts.shifts ? `${plural(counts.shifts, 'schedule')}` : 'No schedules yet',
       done: counts.shifts > 0,
       optional: false,
       to: '/shifts',
-      action: 'Create a shift',
+      action: 'Create a schedule',
+    },
+    {
+      id: 'holidays',
+      title: 'Add your holidays',
+      description: 'Add the public and company holidays for the year, so nobody is expected to work on them.',
+      detail: counts.holidayCalendars ? `${plural(counts.holidayCalendars, 'calendar')}` : 'Optional',
+      done: counts.holidayCalendars > 0,
+      optional: true,
+      to: '/holidays',
+      action: 'Add holidays',
     },
     {
       id: 'employees',

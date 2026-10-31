@@ -333,5 +333,136 @@ ok('other org cannot archive', (await upd(id.bAdmin, `archived_at=now()`, U(305)
 ok('supervisor cannot archive', (await upd(id.aSup, `archived_at=now()`, U(305))).length === 0)
 ok('archive audited', (await q(`select count(*)::int n from audit_logs where table_name='employees' and record_id=$1 and new_values->>'archived_at' is not null`, [U(303)]))[0].n >= 1)
 
+// T12 work schedules, holiday calendars and the time-tracking policy
+const dayShift = (await q(`select * from shifts where id=$1`, [U(121)]))[0]
+ok('existing shift becomes a fixed Monday-to-Friday schedule', dayShift.schedule_type === 'fixed'
+  && JSON.stringify(dayShift.working_days) === '[1,2,3,4,5]' && dayShift.breaks.length === 0 && !dayShift.is_default
+  && dayShift.start_time === '09:00:00', JSON.stringify(dayShift))
+ok('department link carried over to the department', (await q(`select shift_id from departments where id=$1`, [U(101)]))[0].shift_id === U(121))
+const asM1 = (sql, params) => as(id.m1, () => q(sql, params))
+const night = (await asM1(`insert into shifts (name, start_time, end_time, working_days, day_times, breaks, day_split_time,
+    overtime_daily_after_minutes, overtime_daily_rate, overtime_double_after_minutes, overtime_double_rate,
+    overtime_weekly_after_minutes, overtime_weekly_rate, overtime_holiday_rate)
+  values ('Night','22:00','06:00','{6,1,1,2,3,4,5}','{"6":{"start":"22:00","end":"02:00"}}',
+    '[{"name":"Meal","minutes":30,"paid":false,"start":"01:00","end":"03:00"},{"name":"Tea","minutes":10,"paid":true}]',
+    '12:00',540,1.5,720,2,2880,1.5,2) returning *`))[0]
+ok('night schedule saved in the organization, working days sorted and unique', night.organization_id === qvrix
+  && JSON.stringify(night.working_days) === '[1,2,3,4,5,6]' && night.breaks.length === 2, JSON.stringify(night.working_days))
+const shiftErr = (cols, vals) => err(() => asM1(`insert into shifts (name, start_time, end_time, ${cols}) values ('X','09:00','18:00', ${vals})`))
+ok('flexible schedule needs daily hours', await shiftErr(`schedule_type`, `'flexible'`) === '23514')
+ok('flexible schedule with daily hours', await shiftErr(`schedule_type, daily_minutes`, `'flexible', 480`) === null)
+ok('weekly flexible schedule with weekly hours', await err(() => asM1(`insert into shifts (name, start_time, end_time, schedule_type, weekly_minutes) values ('Weekly','08:00','20:00','weekly_flexible',2400)`)) === null)
+ok('fixed schedule cannot carry a daily target', await shiftErr(`daily_minutes`, `480`) === '23514')
+ok('unknown schedule type rejected', await shiftErr(`schedule_type`, `'rota'`) === '23514')
+ok('weekday outside 1-7 rejected', await shiftErr(`working_days`, `'{1,8}'`) === '23514')
+ok('a schedule needs a working day', await shiftErr(`working_days`, `'{}'`) === '23514')
+ok('own hours only on working days', await shiftErr(`day_times`, `'{"7":{"start":"10:00","end":"14:00"}}'`) === '22023')
+ok('malformed day hours rejected', await shiftErr(`day_times`, `'{"1":{"start":"9am","end":"14:00"}}'`) === '22023')
+ok('flexible schedules cannot set per-day hours', await shiftErr(`schedule_type, daily_minutes, day_times`, `'flexible', 480, '{"1":{"start":"10:00","end":"14:00"}}'`) === '22023')
+ok('start and end must differ', await err(() => asM1(`insert into shifts (name, start_time, end_time) values ('Zero','09:00','09:00')`)) === '22023')
+for (const [label, breaks] of [
+  ['zero-minute break', '[{"name":"Lunch","minutes":0,"paid":false}]'],
+  ['minutes as text', '[{"name":"Lunch","minutes":"30","paid":false}]'],
+  ['break without paid flag', '[{"name":"Lunch","minutes":30}]'],
+  ['break with an unknown field', '[{"name":"Lunch","minutes":30,"paid":false,"note":"x"}]'],
+  ['break start without end', '[{"name":"Lunch","minutes":30,"paid":false,"start":"13:00"}]'],
+  ['break that is not an object', '["Lunch"]'],
+  ['breaks that are not a list', '{"name":"Lunch"}'],
+  ['six breaks', JSON.stringify(Array.from({ length: 6 }, (_, i) => ({ name: `B${i}`, minutes: 5, paid: true })))],
+]) ok(`rejected: ${label}`, await shiftErr(`breaks`, `'${breaks}'`) === '22023')
+ok('unpaid breaks must leave working time', await err(() => asM1(`insert into shifts (name, start_time, end_time, breaks) values ('Short','09:00','10:00','[{"name":"Lunch","minutes":60,"paid":false}]')`)) === '22023')
+ok('paid breaks may fill the day', await err(() => asM1(`insert into shifts (name, start_time, end_time, breaks) values ('Paid','09:00','10:00','[{"name":"Rest","minutes":60,"paid":true}]')`)) === null)
+ok('automatic break needs both values', await shiftErr(`auto_break_minutes`, `30`) === '23514')
+ok('automatic break saved', await shiftErr(`auto_break_minutes, auto_break_after_minutes`, `30, 360`) === null)
+ok('double overtime needs daily overtime', await shiftErr(`overtime_double_after_minutes, overtime_double_rate`, `720, 2`) === '23514')
+ok('double overtime starts after daily overtime', await shiftErr(`overtime_daily_after_minutes, overtime_daily_rate, overtime_double_after_minutes, overtime_double_rate`, `540, 1.5, 540, 2`) === '23514')
+ok('overtime rate limited to 5x', await shiftErr(`overtime_holiday_rate`, `6`) === '23514')
+ok('supervisor cannot create schedules', await err(() => as(id.aSup, () => q(`insert into shifts (name, start_time, end_time, organization_id) values ('No','09:00','18:00',$1)`, [qvrix]))) === '42501')
+await asM1(`update shifts set is_default = true where id=$1`, [night.id])
+await asM1(`update shifts set is_default = true where name='Weekly'`)
+ok('a new default takes over from the previous one', (await q(`select name from shifts where organization_id=$1 and is_default`, [qvrix])).map((r) => r.name).join() === 'Weekly')
+const updatedAt = (await q(`select updated_at from shifts where id=$1`, [night.id]))[0].updated_at
+ok('schedule edits stamp updated_at', new Date(updatedAt).getTime() > new Date(night.updated_at).getTime())
+ok('one schedule can be the default for several departments', await err(() => asM1(`update departments set shift_id=$1 where id in ($2,$3)`, [night.id, U(102), U(103)])) === null)
+ok('a schedule in use by a department cannot be deleted', await err(() => asM1(`delete from shifts where id=$1`, [night.id])) === '23503')
+const betaDept = (await q(`select id from departments where organization_id=$1 limit 1`, [beta]))[0].id
+ok('department cannot use another organization schedule', await err(() => as(id.bAdmin, () => q(`update departments set shift_id=$1 where id=$2`, [U(121), betaDept]))) === '23503')
+
+// Holiday calendars
+const dateIn = (days) => new Date(Date.now() + days * 864e5).toISOString().slice(0, 10)
+const national = (await asM1(`insert into holiday_calendars (name, is_default) values ('National', true) returning *`))[0]
+const state = (await asM1(`insert into holiday_calendars (name) values ('Karnataka') returning *`))[0]
+ok('calendar stamped with the organization', national.organization_id === qvrix && state.organization_id === qvrix)
+ok('calendar names unique ignoring case', await err(() => asM1(`insert into holiday_calendars (name) values (' national ')`)) === '23505')
+const holiday = (await asM1(`insert into holidays (calendar_id, holiday_date, name) values ($1,$2,'Founders Day'),($1,$3,'Harvest'),($1,$4,'Old'),($1,$5,'Far'),($1,$6,'Last week') returning organization_id`,
+  [national.id, dateIn(2), dateIn(60), dateIn(-40), dateIn(400), dateIn(-10)]))[0]
+ok('holiday takes its calendar organization', holiday.organization_id === qvrix)
+await asM1(`insert into holidays (calendar_id, holiday_date, name) values ($1,$2,'State Day')`, [state.id, dateIn(5)])
+ok('one holiday per calendar and date', await err(() => asM1(`insert into holidays (calendar_id, holiday_date, name) values ($1,$2,'Again')`, [national.id, dateIn(2)])) === '23505')
+ok('another organization cannot add holidays to this calendar', await err(() => as(id.bAdmin, () => q(`insert into holidays (calendar_id, holiday_date, name) values ($1,$2,'Sneaky')`, [national.id, dateIn(3)]))) === '42501')
+ok('another organization cannot see the calendars', await n(id.bAdmin, `select count(*)::int n from holiday_calendars`) === 0 && await n(id.bAdmin, `select count(*)::int n from holidays`) === 0)
+ok('supervisor reads holidays', await n(id.aSup, `select count(*)::int n from holidays`) === 6)
+ok('supervisor cannot add holidays', await err(() => as(id.aSup, () => q(`insert into holidays (calendar_id, holiday_date, name) values ($1,$2,'No')`, [national.id, dateIn(9)]))) === '42501')
+ok('employees do not read calendars directly', await n(id.e1, `select count(*)::int n from holiday_calendars`) === 0 && await n(id.e1, `select count(*)::int n from holidays`) === 0)
+ok('employee cannot use another organization calendar', await err(() => as(id.bAdmin, () => q(`update employees set holiday_calendar_id=$1 where id=$2`, [national.id, bEmpRow.id]))) === '23503')
+const spare = (await asM1(`insert into holiday_calendars (name, is_default) values ('Spare', true) returning id`))[0].id
+ok('default calendar handed over', (await q(`select name from holiday_calendars where organization_id=$1 and is_default`, [qvrix])).map((r) => r.name).join() === 'Spare')
+await asM1(`insert into holidays (calendar_id, holiday_date, name) values ($1,$2,'Spare Day')`, [spare, dateIn(7)])
+await asM1(`update holiday_calendars set is_default = true where id=$1`, [national.id])
+await asM1(`delete from holiday_calendars where id=$1`, [spare])
+ok('deleting an unused calendar removes its holidays', (await q(`select count(*)::int n from holidays where calendar_id=$1`, [spare]))[0].n === 0)
+
+// Effective rules through my_work_rules()
+const rules = async (uid) => (await as(uid, () => q(`select my_work_rules() r`)))[0].r
+let r1 = await rules(id.e1)
+ok('employee schedule comes first', r1.schedule?.id === U(121) && r1.schedule.source === 'employee' && !('organization_id' in r1.schedule), JSON.stringify(r1.schedule))
+ok('default holiday calendar applies, limited to the coming year and the last month',
+  r1.holiday_calendar?.source === 'organization' && r1.holidays.map((h) => h.name).join() === 'Last week,Founders Day,Harvest', JSON.stringify(r1.holidays))
+ok('no policy yet means everything off', r1.policy.source === 'default' && r1.policy.require_inside_site === false && r1.policy.early_clock_in_minutes === null)
+ok('organization time zone included', r1.timezone === 'Asia/Kolkata')
+await asM1(`update employees set shift_id=null where id=$1`, [U(302)])
+ok('department schedule when the employee has none', (await rules(id.e2)).schedule?.source === 'department' && (await rules(id.e2)).schedule.id === U(121))
+await asM1(`update departments set shift_id=null where id=$1`, [U(101)])
+ok('organization default when neither has one', (await rules(id.e2)).schedule?.name === 'Weekly' && (await rules(id.e2)).schedule.source === 'organization')
+await asM1(`update departments set holiday_calendar_id=$1 where id=$2`, [state.id, U(101)])
+r1 = await rules(id.e1)
+ok('department calendar replaces the default', r1.holiday_calendar?.name === 'Karnataka' && r1.holiday_calendar.source === 'department' && r1.holidays.map((h) => h.name).join() === 'State Day')
+await asM1(`update employees set holiday_calendar_id=$1 where id=$2`, [national.id, U(301)])
+ok('employee calendar comes first', (await rules(id.e1)).holiday_calendar?.source === 'employee')
+ok('a calendar in use cannot be deleted', await err(() => asM1(`delete from holiday_calendars where id=$1`, [national.id])) === '23503')
+ok('no schedule and no calendar when the organization has none', await (async () => {
+  const rb = await rules(id.bEmp)
+  return rb.schedule === null && rb.holiday_calendar === null && rb.holidays.length === 0
+})())
+await as(id.bAdmin, () => q(`insert into shifts (name, start_time, end_time, is_default) values ('Beta Day','08:00','17:00', true)`))
+ok('each organization has its own default', (await rules(id.bEmp)).schedule?.name === 'Beta Day'
+  && (await q(`select count(*)::int n from shifts where organization_id=$1 and is_default`, [qvrix]))[0].n === 1)
+ok('archived employees get no rules', await rules(id.e3) === null)
+ok('accounts without an employee profile get no rules', await rules(id.u9) === null)
+ok('anon cannot read rules', await err(() => as(null, () => q(`select my_work_rules()`), 'anon')) === '42501')
+ok('rules for other employees are not callable', await err(() => as(id.m1, () => q(`select work_rules_for_employee($1)`, [U(302)]))) === '42501')
+
+// Time-tracking policy: admins only
+await db.query(`insert into auth.users (id,email,raw_app_meta_data,email_confirmed_at) values ($1,'mgr@qvrix.test','{}',now())`, [U(56)])
+await q(`insert into organization_members (organization_id, user_id, role) values ($1,$2,'manager')`, [qvrix, U(56)])
+ok('managers cannot set the policy', await err(() => as(U(56), () => q(`insert into time_tracking_policies (early_clock_in_minutes, organization_id) values (15,$1)`, [qvrix]))) === '42501')
+const orgPolicy = (await asM1(`insert into time_tracking_policies (early_clock_in_minutes, require_inside_site, auto_clock_out_after_minutes, updated_by) values (15, true, 720, $1) returning *`, [id.m2]))[0]
+ok('policy stamped with the organization and the real editor', orgPolicy.organization_id === qvrix && orgPolicy.updated_by === id.m1)
+ok('one organization policy', await err(() => asM1(`insert into time_tracking_policies (early_clock_in_minutes) values (5)`)) === '23505')
+ok('policy values checked', await err(() => asM1(`insert into time_tracking_policies (department_id, auto_clock_out_after_minutes) values ($1, 10)`, [U(102)])) === '23514')
+r1 = await rules(id.e1)
+ok('organization policy applies', r1.policy.source === 'organization' && r1.policy.early_clock_in_minutes === 15 && r1.policy.require_inside_site === true)
+await asM1(`insert into time_tracking_policies (department_id, block_outside_schedule) values ($1, true)`, [U(101)])
+r1 = await rules(id.e1)
+ok('department policy replaces it whole', r1.policy.source === 'department' && r1.policy.block_outside_schedule === true && r1.policy.early_clock_in_minutes === null)
+ok('one policy per department', await err(() => asM1(`insert into time_tracking_policies (department_id) values ($1)`, [U(101)])) === '23505')
+ok('managers cannot change it', await n(U(56), `with u as (update time_tracking_policies set early_clock_in_minutes=0 returning 1) select count(*)::int n from u`) === 0)
+ok('supervisors read the policy', await n(id.aSup, `select count(*)::int n from time_tracking_policies`) === 2)
+ok('other organizations cannot see it', await n(id.bAdmin, `select count(*)::int n from time_tracking_policies`) === 0)
+ok('department policy cannot name another organization department', await err(() => as(id.bAdmin, () => q(`insert into time_tracking_policies (department_id) values ($1)`, [U(101)]))) === '23503')
+ok('employees do not read policies directly', await n(id.e1, `select count(*)::int n from time_tracking_policies`) === 0)
+ok('schedule, calendar and policy changes audited', (await q(`select count(distinct table_name)::int n from audit_logs
+  where organization_id=$1 and table_name in ('shifts','holiday_calendars','holidays','time_tracking_policies')`, [qvrix]))[0].n === 4)
+
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

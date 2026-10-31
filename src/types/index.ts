@@ -20,6 +20,12 @@ export type {
   EmployeeUpdate,
   EmployeeSite,
   EmployeeSiteInsert,
+  HolidayCalendar,
+  HolidayCalendarInsert,
+  Holiday,
+  HolidayInsert,
+  TimeTrackingPolicy,
+  TimeTrackingPolicyInsert,
   AuditLog,
   Database,
 } from './database.types'

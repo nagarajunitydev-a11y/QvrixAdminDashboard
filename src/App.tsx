@@ -29,6 +29,8 @@ import { UsersRolesPage } from './features/users/UsersRolesPage'
 import { SettingsPage } from './features/settings/SettingsPage'
 import { AuditLogsPage } from './features/audit-logs/AuditLogsPage'
 import { GettingStartedPage } from './features/onboarding/GettingStartedPage'
+import { HolidaysPage } from './features/holidays/HolidaysPage'
+import { TimePolicyPage } from './features/time-policy/TimePolicyPage'
 
 function App() {
   return (
@@ -51,6 +53,8 @@ function App() {
                       <Route path="/departments" element={<DepartmentsPage />} />
                       <Route path="/designations" element={<DesignationsPage />} />
                       <Route path="/shifts" element={<ShiftsPage />} />
+                      <Route path="/holidays" element={<HolidaysPage />} />
+                      <Route path="/time-policy" element={<TimePolicyPage />} />
                       <Route path="/sites" element={<SitesPage />} />
                       <Route path="/site-workers" element={<SiteWorkersPage />} />
                       <Route path="/attendance" element={<PresenceSessionsPage />} />
