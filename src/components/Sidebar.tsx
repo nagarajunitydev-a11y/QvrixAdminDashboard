@@ -11,6 +11,7 @@ import {
   BellRing,
   CalendarClock,
   CalendarDays,
+  CalendarRange,
   Briefcase,
   Building2,
   CalendarCheck,
@@ -55,6 +56,7 @@ const navGroups = [
     label: 'Operations',
     items: [
       { label: 'Attendance', to: '/attendance', icon: CalendarCheck },
+      { label: 'Timesheets', to: '/timesheets', icon: CalendarRange },
       { label: 'Work Schedules', to: '/shifts', icon: CalendarClock },
       { label: 'Holidays', to: '/holidays', icon: CalendarDays },
       { label: 'History', to: '/history', icon: History },
@@ -89,6 +91,7 @@ const routeTitles: Array<[string, string]> = [
   ['/site-workers', 'Site Workers'],
   ['/attendance', 'Attendance'],
   ['/presence', 'Attendance'],
+  ['/timesheets', 'Timesheets'],
   ['/shifts', 'Work Schedules'],
   ['/holidays', 'Holidays'],
   ['/time-policy', 'Time Tracking Policy'],

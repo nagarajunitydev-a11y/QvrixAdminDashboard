@@ -31,6 +31,7 @@ import { AuditLogsPage } from './features/audit-logs/AuditLogsPage'
 import { GettingStartedPage } from './features/onboarding/GettingStartedPage'
 import { HolidaysPage } from './features/holidays/HolidaysPage'
 import { TimePolicyPage } from './features/time-policy/TimePolicyPage'
+import { TimesheetsPage } from './features/timesheets/TimesheetsPage'
 
 function App() {
   return (
@@ -59,6 +60,7 @@ function App() {
                       <Route path="/site-workers" element={<SiteWorkersPage />} />
                       <Route path="/attendance" element={<PresenceSessionsPage />} />
                       <Route path="/presence" element={<PresenceSessionsPage />} />
+                      <Route path="/timesheets" element={<TimesheetsPage />} />
                       <Route path="/history" element={<LocationLogsPage />} />
                       <Route path="/location-logs" element={<LocationLogsPage />} />
                       <Route path="/alerts" element={<AlertsPage />} />

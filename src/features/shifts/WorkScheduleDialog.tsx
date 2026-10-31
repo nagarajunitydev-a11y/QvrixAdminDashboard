@@ -266,7 +266,7 @@ export function WorkScheduleDialog({
             )}
           </Section>
 
-          <Section title="Breaks" description="Unpaid breaks are taken off worked time. A time window is optional.">
+          <Section title="Breaks" description="Timesheets take unpaid breaks with a time window off the worked time inside that window. Breaks without a window are deducted once the app records breaks; until then, the automatic break below covers long days.">
             {form.breaks.length > 0 && (
               <div className="space-y-2">
                 {form.breaks.map((item, index) => (

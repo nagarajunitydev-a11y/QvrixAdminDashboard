@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import { mutationError } from './mutationErrors'
 import { currentOrganizationId } from './organizationScope'
+import type { TimeEntryCorrection, TimesheetDay, TimesheetEntry } from '../lib/timesheets'
 import type {
   Site,
   SiteInsert,
@@ -561,4 +562,86 @@ export async function fetchActivePresenceSessions(): Promise<PresenceSession[]> 
     .is('exit_timestamp', null)
   if (error) throw error
   return data
+}
+
+// Timesheets: computed on the server from sessions, corrections, schedules, holidays and the policy
+export async function fetchTimesheet(from: string, to: string, employeeIds?: string[]): Promise<TimesheetDay[]> {
+  const { data, error } = await supabase.rpc('timesheet_days', {
+    p_organization_id: currentOrganizationId(),
+    p_from: from,
+    p_to: to,
+    p_employee_ids: employeeIds ?? null,
+  })
+  if (error) throw error
+  return data as TimesheetDay[]
+}
+
+export async function fetchTimesheetEntries(employeeId: string, from: string, to: string): Promise<TimesheetEntry[]> {
+  const { data, error } = await supabase.rpc('timesheet_entries', {
+    p_organization_id: currentOrganizationId(),
+    p_employee_id: employeeId,
+    p_from: from,
+    p_to: to,
+  })
+  if (error) throw error
+  return data as TimesheetEntry[]
+}
+
+/** Every correction for these sessions, or for entries starting in the window, newest first, voided ones included. */
+export async function fetchTimeCorrections(employeeId: string, sessionIds: number[], windowStart: Date, windowEnd: Date): Promise<TimeEntryCorrection[]> {
+  const inWindow = `and(start_at.gte."${windowStart.toISOString()}",start_at.lt."${windowEnd.toISOString()}")`
+  const { data, error } = await from('time_entry_corrections')
+    .select('*')
+    .eq('organization_id', currentOrganizationId())
+    .eq('employee_id', employeeId)
+    .or(sessionIds.length ? `${inWindow},session_id.in.(${sessionIds.join(',')})` : inWindow)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data as TimeEntryCorrection[]
+}
+
+/** A time entry is either a session recorded by the app or an entry a manager added. */
+export type TimeEntryTarget = { sessionId: number; correctionId?: null } | { sessionId?: null; correctionId: string }
+
+/** Times are "YYYY-MM-DD HH:MM" in the organization's time zone; the server converts them. */
+export async function addTimeEntry(employeeId: string, siteId: string | null, start: string, end: string, reason: string): Promise<void> {
+  const { error } = await supabase.rpc('add_time_entry', {
+    p_employee_id: employeeId, p_site_id: siteId, p_start: start, p_end: end, p_reason: reason,
+  })
+  if (error) throw mutationError(error, 'add this time entry')
+}
+
+export async function editTimeEntry(target: TimeEntryTarget, siteId: string | null, start: string, end: string, reason: string): Promise<void> {
+  const { error } = await supabase.rpc('edit_time_entry', {
+    p_session_id: target.sessionId ?? null, p_correction_id: target.correctionId ?? null,
+    p_site_id: siteId, p_start: start, p_end: end, p_reason: reason,
+  })
+  if (error) throw mutationError(error, 'correct this time entry')
+}
+
+export async function removeTimeEntry(target: TimeEntryTarget, reason: string): Promise<void> {
+  const { error } = await supabase.rpc('remove_time_entry', {
+    p_session_id: target.sessionId ?? null, p_correction_id: target.correctionId ?? null, p_reason: reason,
+  })
+  if (error) throw mutationError(error, 'remove this time entry')
+}
+
+export async function restoreTimeEntry(sessionId: number, reason: string): Promise<void> {
+  const { error } = await supabase.rpc('restore_time_entry', { p_session_id: sessionId, p_reason: reason })
+  if (error) throw mutationError(error, 'restore this time entry')
+}
+
+export type TrailPoint = Pick<LocationLog, 'latitude' | 'longitude' | 'timestamp' | 'is_inside' | 'site_id'>
+
+export async function fetchLocationTrail(userId: string, fromMs: number, toMs: number): Promise<TrailPoint[]> {
+  const { data, error } = await from('location_logs')
+    .select('latitude, longitude, timestamp, is_inside, site_id')
+    .eq('organization_id', currentOrganizationId())
+    .eq('user_id', userId)
+    .gte('timestamp', fromMs)
+    .lte('timestamp', toMs)
+    .order('timestamp')
+    .limit(500)
+  if (error) throw error
+  return data as TrailPoint[]
 }

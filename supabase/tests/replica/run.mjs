@@ -464,5 +464,141 @@ ok('employees do not read policies directly', await n(id.e1, `select count(*)::i
 ok('schedule, calendar and policy changes audited', (await q(`select count(distinct table_name)::int n from audit_logs
   where organization_id=$1 and table_name in ('shifts','holiday_calendars','holidays','time_tracking_policies')`, [qvrix]))[0].n === 4)
 
+// T13 timesheets and corrections, on fixed past weeks in India time (UTC+05:30)
+const ist = (date, hm) => new Date(`${date}T${hm}:00+05:30`).getTime()
+await db.query(`insert into auth.users (id,email,raw_app_meta_data,email_confirmed_at) values ($1,'ts@qvrix.test','{}',now()),($2,'night@qvrix.test','{}',now())`, [U(60), U(61)])
+const tsShift = (await asM1(`insert into shifts (name, start_time, end_time, working_days, day_times, breaks,
+    auto_break_minutes, auto_break_after_minutes, overtime_daily_after_minutes, overtime_daily_rate,
+    overtime_double_after_minutes, overtime_double_rate, overtime_weekly_after_minutes, overtime_weekly_rate,
+    overtime_rest_day_rate, overtime_holiday_rate)
+  values ('TS Day','09:00','18:00','{1,2,3,4,5,6}','{"6":{"start":"09:00","end":"13:00"}}',
+    '[{"name":"Lunch","minutes":60,"paid":false,"start":"13:00","end":"14:00"},{"name":"Tea","minutes":15,"paid":true}]',
+    30, 360, 540, 1.5, 600, 2, 1200, 1.5, 2, 2.5) returning id`))[0].id
+const tsCal = (await asM1(`insert into holiday_calendars (name) values ('TS Cal') returning id`))[0].id
+await asM1(`insert into holidays (calendar_id, holiday_date, name) values ($1,'2026-10-22','Test Holiday')`, [tsCal])
+const tsEmp = U(360), nightEmp = U(361)
+await q(`insert into employees (id, user_id, first_name, last_name, email, organization_id, shift_id, holiday_calendar_id, created_at) values
+  ($1,$2,'Time','Sheet','ts@qvrix.test',$3,$4,$5,'2026-01-01'), ($6,$7,'Night','Guard','night@qvrix.test',$3,$8,$5,'2026-01-01')`,
+  [tsEmp, U(60), qvrix, tsShift, tsCal, nightEmp, U(61), night.id])
+for (const [day, from, to, site] of [
+  ['2026-10-19', '08:30', '18:10', U(201)], ['2026-10-20', '09:20', '21:30', U(201)],
+  ['2026-10-21', '09:00', '12:00', U(201)], ['2026-10-21', '11:00', '15:00', U(202)],
+  ['2026-10-22', '10:00', '14:00', U(201)], ['2026-10-24', '09:00', '13:00', U(201)],
+  ['2026-10-25', '10:00', '12:00', U(201)], ['2026-10-26', '09:00', null, U(201)],
+  ['2026-10-27', '09:00', '17:00', U(201)], ['2026-10-28', '09:00', '18:00', U(201)],
+  ['2026-10-30', '06:00', '12:30', U(201)],
+]) await q(`insert into presence_sessions (user_id, site_id, entry_timestamp, exit_timestamp) values ($1,$2,$3,$4)`,
+  [U(60), site, ist(day, from), to ? ist(day, to) : null])
+await q(`insert into presence_sessions (user_id, site_id, entry_timestamp, exit_timestamp) values ($1,$2,$3,$4)`,
+  [U(61), U(201), ist('2026-10-19', '22:00'), ist('2026-10-20', '06:00')])
+const sessionAt = async (day, hm) => (await q(`select id from presence_sessions where user_id=$1 and entry_timestamp=$2`, [U(60), ist(day, hm)]))[0].id
+const sheet = async (uid, from, to, ids = [tsEmp], org = qvrix) => Object.fromEntries((await as(uid, () =>
+  q(`select t.*, t.work_date::text as day from timesheet_days($1,$2,$3,$4) t`, [org, from, to, ids]))).map((d) => [d.day, d]))
+// tracked, break, payroll, planned, regular, daily, double, weekly, rest day, holiday, late, early out
+const figures = (d) => [d.tracked_minutes, d.break_minutes, d.payroll_minutes, d.planned_minutes, d.regular_minutes,
+  d.overtime_daily_minutes, d.overtime_double_minutes, d.overtime_weekly_minutes, d.overtime_rest_day_minutes,
+  d.overtime_holiday_minutes, d.late_minutes, d.early_out_minutes].join()
+const added = (await asM1(`select add_time_entry($1,$2,'2026-10-24 14:00','2026-10-24 16:00','Worked at the office after the site visit') id`, [tsEmp, U(201)]))[0].id
+const w1 = await sheet(id.m1, '2026-10-19', '2026-10-25')
+ok('one row per day', Object.keys(w1).length === 7)
+ok('early arrival: lunch window deducted, early check-in flagged', figures(w1['2026-10-19']) === '580,60,520,480,520,0,0,0,0,0,0,0'
+  && w1['2026-10-19'].flags.includes('early_check_in'), figures(w1['2026-10-19']) + ' ' + w1['2026-10-19'].flags)
+ok('late, and capped at 12 h by the automatic check-out; daily and double overtime', figures(w1['2026-10-20']) === '720,60,660,480,540,60,60,0,0,0,20,0'
+  && w1['2026-10-20'].flags.includes('late') && w1['2026-10-20'].flags.includes('auto_check_out'), figures(w1['2026-10-20']) + ' ' + w1['2026-10-20'].flags)
+ok('overlapping sessions counted once; weekly overtime starts on the day past 20 h', figures(w1['2026-10-21']) === '360,60,300,480,140,0,0,160,0,0,0,180'
+  && w1['2026-10-21'].flags.includes('overlap') && w1['2026-10-21'].flags.includes('early_out'), figures(w1['2026-10-21']) + ' ' + w1['2026-10-21'].flags)
+ok('holiday work at the holiday rate', figures(w1['2026-10-22']) === '240,60,180,0,0,0,0,0,0,180,0,0'
+  && w1['2026-10-22'].day_type === 'holiday' && w1['2026-10-22'].holiday_name === 'Test Holiday', figures(w1['2026-10-22']))
+ok('no check-in on a working day is absent', w1['2026-10-23'].flags.includes('absent') && w1['2026-10-23'].payroll_minutes === 0 && w1['2026-10-23'].planned_minutes === 480)
+ok('Saturday half day with an added entry, all weekly overtime', figures(w1['2026-10-24']) === '360,0,360,180,0,0,0,360,0,0,0,0'
+  && w1['2026-10-24'].flags.includes('manual') && w1['2026-10-24'].entry_count === 2, figures(w1['2026-10-24']))
+ok('rest-day work at the rest-day rate', figures(w1['2026-10-25']) === '120,0,120,0,0,0,0,0,120,0,0,0' && w1['2026-10-25'].day_type === 'rest', figures(w1['2026-10-25']))
+const nightDay = (await sheet(id.m1, '2026-10-19', '2026-10-19', [nightEmp]))['2026-10-19']
+ok('night shift stays on the day it started; meal window falls after midnight', nightDay.tracked_minutes === 480
+  && nightDay.break_minutes === 30 && nightDay.late_minutes === 0 && nightDay.first_in.getTime() === ist('2026-10-19', '22:00'), JSON.stringify(nightDay))
+
+// Corrections
+const tue = await sessionAt('2026-10-27', '09:00'), wed = await sessionAt('2026-10-28', '09:00')
+await asM1(`select edit_time_entry($1, null, null, '2026-10-27 09:00', '2026-10-27 18:00', 'Forgot to check out at the end of the day')`, [tue])
+await asM1(`select remove_time_entry($1, null, 'Checked in on a colleague''s phone by mistake')`, [wed])
+let w2 = await sheet(id.m1, '2026-10-26', '2026-10-30')
+ok('open session closed by the policy after 12 h', figures(w2['2026-10-26']) === '720,60,660,480,540,60,60,0,0,0,0,0'
+  && w2['2026-10-26'].flags.includes('auto_check_out'), figures(w2['2026-10-26']) + ' ' + w2['2026-10-26'].flags)
+ok('corrected session uses the manager times', w2['2026-10-27'].tracked_minutes === 540 && w2['2026-10-27'].payroll_minutes === 480
+  && w2['2026-10-27'].flags.includes('manual'), figures(w2['2026-10-27']))
+ok('removed session no longer counts', w2['2026-10-28'].payroll_minutes === 0 && w2['2026-10-28'].flags.includes('absent'))
+ok('automatic break on a long day without lunch; weekly overtime by Friday', figures(w2['2026-10-30']) === '390,30,360,480,180,0,0,180,0,0,0,330'
+  && w2['2026-10-30'].flags.includes('early_check_in'), figures(w2['2026-10-30']))
+const entries = await as(id.m1, () => q(`select * from timesheet_entries($1,$2,'2026-10-26','2026-10-30')`, [qvrix, tsEmp]))
+const corrected = entries.find((e) => e.session_id === tue)
+ok('entries show what the app recorded beside the correction', corrected.status === 'corrected'
+  && Number(corrected.recorded_end) === ist('2026-10-27', '17:00') && Number(corrected.end_at) === ist('2026-10-27', '18:00'), JSON.stringify(corrected))
+ok('removed and open entries are listed with their state', entries.find((e) => e.session_id === wed)?.status === 'removed'
+  && entries.find((e) => e.status === 'recorded' && e.end_at === null)?.end_state === 'auto_check_out')
+ok('removing twice is refused', await err(() => asM1(`select remove_time_entry($1, null, 'Again')`, [wed])) === '22023')
+await asM1(`select restore_time_entry($1, 'Was a real visit after all')`, [wed])
+w2 = await sheet(id.m1, '2026-10-26', '2026-10-30')
+ok('restored session counts again', w2['2026-10-28'].payroll_minutes === 480 && !w2['2026-10-28'].flags.includes('absent'))
+ok('nothing left to restore', await err(() => asM1(`select restore_time_entry($1, 'Again')`, [wed])) === '22023')
+const edited = (await asM1(`select edit_time_entry(null, $1, null, '2026-10-24 14:00', '2026-10-24 17:00', 'Stayed until five') id`, [added]))[0].id
+const chain = await q(`select id, supersedes_id, voided_at is not null as voided, void_reason from time_entry_corrections where id in ($1,$2)`, [added, edited])
+ok('editing an added entry voids it and links the new one', chain.find((c) => c.id === added).voided
+  && chain.find((c) => c.id === edited).supersedes_id === added && !chain.find((c) => c.id === edited).voided, JSON.stringify(chain))
+ok('an old version cannot be edited', await err(() => asM1(`select edit_time_entry(null, $1, null, '2026-10-24 14:00', '2026-10-24 15:00', 'Stale edit')`, [added])) === '22023')
+ok('the timesheet follows the latest version', (await sheet(id.m1, '2026-10-24', '2026-10-24'))['2026-10-24'].tracked_minutes === 420)
+await asM1(`select remove_time_entry(null, $1, 'Entered for the wrong person')`, [edited])
+ok('withdrawn entry no longer counts', (await sheet(id.m1, '2026-10-24', '2026-10-24'))['2026-10-24'].tracked_minutes === 240)
+ok('history keeps every version', (await q(`select count(*)::int n from time_entry_corrections where employee_id=$1`, [tsEmp]))[0].n === 4
+  && (await q(`select count(*)::int n from time_entry_corrections where employee_id=$1 and voided_at is null`, [tsEmp]))[0].n === 1)
+const addErr = (start, end, reason = 'A valid reason') => err(() => asM1(`select add_time_entry($1,$2,$3,$4,$5)`, [tsEmp, U(201), start, end, reason]))
+ok('reason required', await addErr('2026-10-29 09:00', '2026-10-29 10:00', 'x') === '22023')
+ok('end after start', await addErr('2026-10-29 10:00', '2026-10-29 09:00') === '22023')
+ok('at most 24 hours', await addErr('2026-10-29 09:00', '2026-10-30 10:00') === '22023')
+ok('not in the future', await addErr('2099-01-01 09:00', '2099-01-01 10:00') === '22023')
+ok('site from another organization refused', await err(() => asM1(`select add_time_entry($1,$2,'2026-10-29 09:00','2026-10-29 10:00','Wrong site')`, [tsEmp, bSite.id])) === '23503')
+ok('supervisors cannot correct', await err(() => as(id.aSup, () => q(`select add_time_entry($1,$2,'2026-10-29 09:00','2026-10-29 10:00','Not allowed')`, [tsEmp, U(201)]))) === '42501')
+ok('other organizations cannot correct', await err(() => as(id.bAdmin, () => q(`select add_time_entry($1,$2,'2026-10-29 09:00','2026-10-29 10:00','Not allowed')`, [tsEmp, U(201)]))) === '42501'
+  && await err(() => as(id.bAdmin, () => q(`select remove_time_entry($1, null, 'Not allowed')`, [tue]))) === '42501')
+ok('corrections cannot be written directly', await err(() => asM1(`insert into time_entry_corrections (organization_id, employee_id, kind, start_at, end_at, reason) values ($1,$2,'add',now() - interval '2 hours',now() - interval '1 hour','Direct')`, [qvrix, tsEmp])) === '42501')
+ok('corrections readable by supervisors, not other organizations', await n(id.aSup, `select count(*)::int n from time_entry_corrections`) === 4
+  && await n(id.bAdmin, `select count(*)::int n from time_entry_corrections`) === 0)
+ok('corrections audited', (await q(`select count(*)::int n from audit_logs where table_name='time_entry_corrections' and organization_id=$1`, [qvrix]))[0].n >= 7)
+
+// Who can read timesheets
+ok('supervisors read timesheets', Object.keys(await sheet(id.aSup, '2026-10-19', '2026-10-25')).length === 7)
+ok('other organizations cannot', await err(() => sheet(id.bAdmin, '2026-10-19', '2026-10-25')) === '42501')
+ok('employees cannot read the team timesheet', await err(() => sheet(U(60), '2026-10-19', '2026-10-25')) === '42501')
+ok('anon cannot', await err(() => as(null, () => q(`select * from timesheet_days($1,'2026-10-19','2026-10-25')`, [qvrix]), 'anon')) === '42501')
+ok('range limited to 63 days', await err(() => sheet(id.m1, '2026-01-01', '2026-10-25')) === '22023' && await err(() => sheet(id.m1, '2026-10-25', '2026-10-19')) === '22023')
+ok('internal calculation not callable', await err(() => asM1(`select * from compute_timesheet($1,'2026-10-19','2026-10-25',null)`, [qvrix])) === '42501')
+const mine = await as(U(60), () => q(`select * from my_timesheet('2026-10-19','2026-10-25')`))
+ok('employees read their own timesheet', mine.length === 7 && mine.every((d) => d.employee_id === tsEmp) && mine.reduce((s, d) => s + d.payroll_minutes, 0) === 2020)
+ok('and their own entries', (await as(U(60), () => q(`select * from my_timesheet_entries('2026-10-26','2026-10-30')`))).some((e) => e.status === 'corrected'))
+ok('accounts without an employee profile have no timesheet', await err(() => as(id.u9, () => q(`select * from my_timesheet('2026-10-19','2026-10-25')`))) === '42501')
+await q(`update employees set created_at='2026-01-01' where id=$1`, [U(303)])
+const teamOn = async (day) => (await as(id.m1, () => q(`select distinct employee_id from timesheet_days($1,$2,$2)`, [qvrix, day]))).map((r) => r.employee_id)
+const tomorrow = new Date(Date.now() + 5.5 * H + 24 * H).toISOString().slice(0, 10)
+ok('whole-team timesheet keeps archived employees for days before they left, not after', (await teamOn('2026-10-19')).includes(U(303))
+  && !(await teamOn(tomorrow)).includes(U(303)) && (await teamOn(tomorrow)).includes(tsEmp))
+
+// Nobody is absent before they joined
+const joiners = await q(`insert into employees (first_name, last_name, email, organization_id, shift_id, hire_date, created_at) values
+  ('New','Joiner','joiner@qvrix.test',$1,$2,null,now()), ('Mid','Week','midweek@qvrix.test',$1,$2,'2026-10-21','2026-01-01') returning id`, [qvrix, tsShift])
+const joinerDays = async (empId) => Object.keys(await sheet(id.m1, '2026-10-19', '2026-10-25', [empId]))
+ok('an employee added today has no earlier days', (await joinerDays(joiners[0].id)).length === 0)
+ok('days before the hire date are left out', (await joinerDays(joiners[1].id)).join() === '2026-10-21,2026-10-22,2026-10-23,2026-10-24,2026-10-25')
+await asM1(`select add_time_entry($1, null, '2026-10-19 09:00', '2026-10-19 12:00', 'Trial day before joining')`, [joiners[1].id])
+ok('a day with recorded time is shown even before the hire date', (await joinerDays(joiners[1].id))[0] === '2026-10-19')
+
+// Open sessions without a policy, and sessions in progress
+await q(`insert into presence_sessions (user_id, site_id, entry_timestamp) values ($1,$2,$3)`, [id.bEmp, bSite.id, ist('2026-10-20', '08:00')])
+const betaDay = (await sheet(id.bAdmin, '2026-10-20', '2026-10-20', [bEmpRow.id], beta))['2026-10-20']
+ok('open session with no automatic check-out is reported, not counted', betaDay.flags.includes('missing_check_out')
+  && betaDay.tracked_minutes === 0 && !betaDay.flags.includes('absent'), JSON.stringify(betaDay))
+const istToday = new Date(Date.now() + 5.5 * H).toISOString().slice(0, 10)
+const istYesterday = new Date(Date.now() + 5.5 * H - 24 * H).toISOString().slice(0, 10)
+const live = Object.values(await sheet(id.m1, istYesterday, istToday, [U(301)])).find((d) => d.flags.includes('in_progress'))
+ok('a session in progress counts up to now', live && live.tracked_minutes >= 290 && live.tracked_minutes <= 310 && live.last_out === null, JSON.stringify(live))
+
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)
