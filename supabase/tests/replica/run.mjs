@@ -650,5 +650,20 @@ ok('creation audited in the new organization', (await q(`select count(*)::int n 
 ok('anon cannot create organizations', await err(() => as(null, () => q(`select create_my_organization('Anon Co','Asia/Kolkata')`), 'anon')) === '42501')
 ok('the eligibility check is not callable directly', await err(() => as(U(72), () => q(`select can_create_organization()`))) === '42501')
 
+// T15 access guidance: only the caller's server-verified status is exposed.
+ok('a linked employee is identified explicitly', (await access(id.e1)).access_block_reason === 'employee')
+ok('an unconfirmed account gets email guidance', (await access(U(71))).access_block_reason === 'confirm_email')
+await db.query(`insert into auth.users (id,email,raw_app_meta_data,email_confirmed_at)
+  values ($1,'brand-new@acme.test','{}',now())`, [U(74)])
+ok('a new confirmed account has no access blocker', (await access(U(74))).access_block_reason === null
+  && (await access(U(74))).can_create_organization === true)
+ok('a pending employee invitation does not mislabel an unlinked account', (await access(U(73))).access_block_reason === null)
+await db.query(`update organization_members set is_active=false where organization_id=$1 and user_id=$2`, [acme, U(70)])
+ok('an owner whose membership was removed gets restoration guidance', (await access(U(70))).access_block_reason === 'organization_unavailable'
+  && (await access(U(70))).organizations.length === 0 && (await access(U(70))).can_create_organization === false)
+await db.query(`update organization_members set is_active=true where organization_id=$1 and user_id=$2`, [acme, U(70)])
+ok('restoring membership restores the workspace', (await access(U(70))).organizations.some(o => o.id === acme))
+ok('anonymous callers cannot inspect account access', await err(() => as(null, () => q(`select my_console_access()`), 'anon')) === '42501')
+
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

@@ -15,8 +15,8 @@ that is deactivated afterwards.
 1. **Create account** (`/signup`, linked from the sign-in page): email and password (8+ characters). Supabase
    Auth sends a confirmation link; the message is the same whether or not the address already has an account.
 2. **Sign in.** An account may now enter the Console if it belongs to an organization, has an open Console
-   invitation, or may create an organization. Accounts with none of these (for example field employees) are
-   still turned away and pointed to the Employee app.
+   invitation, or may create an organization. Accounts with none of these keep their authenticated session
+   and receive access guidance, with a refresh action and an account switch. See `sign-in-access-workflow.md`.
 3. **Setup wizard** (`/setup`), one step per page, with a progress rail, Back, step links for steps already
    reached, and "Skip setup":
 

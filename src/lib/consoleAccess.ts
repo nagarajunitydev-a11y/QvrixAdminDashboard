@@ -31,6 +31,22 @@ export interface ConsoleAccess {
   invitations?: ConsoleInvitation[]
   /** Whether this account may create its own organization (migration 20261031000003). */
   can_create_organization?: boolean
+  /** Server diagnosis for accounts without a Console membership (migration 20261101000000). */
+  access_block_reason?: 'employee' | 'confirm_email' | 'organization_unavailable' | 'role_required' | null
+}
+
+export type ConsoleEntry = 'workspace' | 'invitations' | 'setup' | 'upgrade' | 'employee'
+  | 'confirm_email' | 'organization_unavailable' | 'role_required' | 'platform'
+
+/** Membership wins over employee status; an employee may also be an invited manager. */
+export function consoleEntry(access: ConsoleAccess): ConsoleEntry {
+  if (access.organizations.length) return 'workspace'
+  if (access.invitations?.length) return 'invitations'
+  if (access.is_platform_admin) return 'platform'
+  if (access.can_create_organization === true) return 'setup'
+  // Older RPCs omit this flag. Never confuse a missing database feature with an employee account.
+  if (access.can_create_organization === undefined) return 'upgrade'
+  return access.access_block_reason ?? 'role_required'
 }
 
 /** Organization admins finish (or skip) setup before using the workspace; other roles never see it. */
@@ -41,7 +57,7 @@ export function needsSetup(organization: ConsoleOrganization | null): boolean {
 
 /** Accounts may sign in to accept an invitation, create an organization, or use one they belong to. */
 export function canEnterConsole(access: ConsoleAccess | null | undefined): boolean {
-  return Boolean(access && (access.organizations.length || access.invitations?.length || access.can_create_organization))
+  return Boolean(access && (access.is_platform_admin || access.organizations.length || access.invitations?.length || access.can_create_organization))
 }
 
 export const roleLabels: Record<ConsoleRole, string> = {

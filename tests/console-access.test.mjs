@@ -8,6 +8,7 @@ const source = ts.transpileModule(readFileSync(new URL('../src/lib/consoleAccess
 }).outputText
 const {
   canEnterConsole,
+  consoleEntry,
   consoleAccessErrorMessage,
   consoleCapabilities,
   deviceHolderLabel,
@@ -87,5 +88,28 @@ test('accounts enter the Console to use, accept or create an organization', () =
   assert.equal(canEnterConsole({ is_platform_admin: false, organizations: [], invitations: [], can_create_organization: true }), true)
   assert.equal(canEnterConsole({ is_platform_admin: false, organizations: [], invitations: [{ id: 'i' }] }), true)
   assert.equal(canEnterConsole({ is_platform_admin: false, organizations: [], invitations: [], can_create_organization: false }), false)
+  assert.equal(canEnterConsole({ is_platform_admin: true, organizations: [] }), true)
   assert.equal(canEnterConsole(null), false)
+})
+
+test('sign-in routes new accounts to setup and existing accounts to their workspace', () => {
+  const empty = { is_platform_admin: false, organizations: [], invitations: [] }
+  assert.equal(consoleEntry({ ...empty, can_create_organization: true }), 'setup')
+  assert.equal(consoleEntry({ ...empty, organizations: [org('a', 'org_admin')], access_block_reason: 'employee' }), 'workspace')
+  assert.equal(consoleEntry({ ...empty, invitations: [{ id: 'i' }], can_create_organization: true }), 'invitations')
+  assert.equal(consoleEntry({ ...empty, is_platform_admin: true }), 'platform')
+})
+
+test('a legacy access response requires an update and never implies employee status', () => {
+  assert.equal(consoleEntry({ is_platform_admin: false, organizations: [] }), 'upgrade')
+  // Self-service deployed, guidance not deployed yet: offer admin help without guessing.
+  assert.equal(consoleEntry({ is_platform_admin: false, organizations: [], can_create_organization: false }), 'role_required')
+})
+
+test('blocked accounts get the server-provided next step while invitations take priority', () => {
+  const empty = { is_platform_admin: false, organizations: [], can_create_organization: false }
+  for (const reason of ['employee', 'confirm_email', 'organization_unavailable', 'role_required']) {
+    assert.equal(consoleEntry({ ...empty, access_block_reason: reason }), reason)
+  }
+  assert.equal(consoleEntry({ ...empty, access_block_reason: 'employee', invitations: [{ id: 'i' }] }), 'invitations')
 })

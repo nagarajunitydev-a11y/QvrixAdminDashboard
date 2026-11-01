@@ -1,9 +1,9 @@
 import { Link, Navigate, Outlet, useLocation } from 'react-router-dom'
-import { ShieldOff } from 'lucide-react'
 import { useAuth } from '../api/AuthProvider'
 import { useOrganization } from '../api/OrganizationProvider'
 import { Button } from '@/components/ui/button'
 import { ConsoleInvitations } from '@/components/ConsoleInvitations'
+import { ConsoleAccessHelp } from '@/components/ConsoleAccessHelp'
 import { ErrorState } from '@/components/ui/states'
 import { consoleAccessErrorMessage, needsSetup } from '@/lib/consoleAccess'
 
@@ -70,26 +70,13 @@ export function ProtectedRoute() {
     return onSetup ? <Outlet /> : <Navigate to="/setup" replace />
   }
 
-  // Signed in, but no organization role: field employees use the mobile app.
-  if (!access.organization) {
-    return (
-      <div className="flex min-h-screen items-center justify-center p-6">
-        <div className="flex w-full max-w-md flex-col items-center gap-4 rounded-xl border border-border bg-card p-8 text-center shadow-sm">
-          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
-            <ShieldOff className="h-5 w-5" />
-          </span>
-          <div>
-            <p className="font-headline text-headline-md text-foreground">No Console access</p>
-            <p className="mt-1 text-body-sm text-muted-foreground">
-              {session.user.email} has no role in any organization. Field employees sign in on the Crewtraxa
-              Employee app. Ask an organization admin to add you if you manage a team.
-            </p>
-          </div>
-          <Button variant="outline" onClick={() => void signOut()}>Sign out</Button>
-        </div>
-      </div>
-    )
+  // A platform admin can create the first organization even when none exist yet.
+  if (!access.organization && access.isPlatformAdmin) {
+    return location.pathname === '/organizations' ? <Outlet /> : <Navigate to="/organizations" replace />
   }
+
+  // Authentication succeeded. Keep the session so invitations or restored roles can be rechecked.
+  if (!access.organization) return <ConsoleAccessHelp />
 
   // Organization admins finish or skip setup before the workspace opens; setup resumes where it was left.
   if (needsSetup(access.organization)) {

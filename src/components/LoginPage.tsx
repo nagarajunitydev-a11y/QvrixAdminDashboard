@@ -1,9 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../api/AuthProvider'
-import { consoleAccessKey, fetchConsoleAccess } from '../api/OrganizationProvider'
-import { canEnterConsole, consoleAccessErrorMessage, type ConsoleAccess } from '@/lib/consoleAccess'
-import { queryClient } from '../api/queryClient'
 import { supabase } from '../api/supabase'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
@@ -132,25 +129,10 @@ export function LoginPage({ mode = 'login' }: { mode?: 'login' | 'forgot' | 'res
         await signOut()
         return
       }
-      const session = await signIn(email, password)
-      // Console access is an organization role checked by the server, not editable profile data.
-      let access: ConsoleAccess | null = null
-      try {
-        access = session
-          ? await queryClient.fetchQuery({ queryKey: consoleAccessKey(session.user.id), queryFn: fetchConsoleAccess })
-          : null
-      } catch (accessError) {
-        // Never leave a signed-in session behind a failed access check.
-        await signOut()
-        setError(consoleAccessErrorMessage(accessError))
-        return
-      }
-      // Accounts sign in to use an organization, answer an invitation, or create their own organization.
-      if (!canEnterConsole(access)) {
-        await signOut()
-        setError('This account has no Crewtraxa Console role. Field employees sign in on the Crewtraxa Employee app.')
-        return
-      }
+      const signedIn = await signIn(email.trim(), password)
+      if (!signedIn) throw new Error('Sign-in did not complete. Please try again.')
+      // ProtectedRoute resolves membership, invitations and setup for both new and restored sessions.
+      // Keep authentication intact so an access issue can be retried without entering credentials again.
       if (remember) {
         localStorage.setItem(REMEMBER_KEY, email)
       } else {
@@ -166,6 +148,9 @@ export function LoginPage({ mode = 'login' }: { mode?: 'login' | 'forgot' | 'res
 
   if (mode === 'login' && isPasswordRecovery) {
     return <Navigate to="/reset-password" replace />
+  }
+  if ((mode === 'login' || isSignup) && session && !isLoading && !loading && !isPasswordRecovery) {
+    return <Navigate to={from} replace />
   }
 
   return (
@@ -281,7 +266,7 @@ export function LoginPage({ mode = 'login' }: { mode?: 'login' | 'forgot' | 'res
                 {isForgot ? 'Forgot password?' : isReset ? 'Reset your password' : isSignup ? 'Create your account' : 'Welcome back'}
               </h2>
               <p className="mt-1 text-body-sm text-muted-foreground">
-                {isForgot ? 'Enter your email address to receive a password reset link.' : isReset ? 'Choose a new password for your account.' : isSignup ? 'Start a Crewtraxa workspace for your team. You will set up your organization next.' : 'Sign in to the Crewtraxa manager console.'}
+                {isForgot ? 'Enter your email address to receive a password reset link.' : isReset ? 'Choose a new password for your account.' : isSignup ? 'Start a Crewtraxa workspace for your team. You will set up your organization next.' : 'Open your workspace, accept a team invitation, or set up your organization.'}
               </p>
             </div>
 
@@ -430,7 +415,7 @@ export function LoginPage({ mode = 'login' }: { mode?: 'login' | 'forgot' | 'res
 
             <div className="mt-5 flex items-center gap-2 border-t border-border/60 pt-4 text-[11px] text-muted-foreground">
               <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
-              {isSignup ? 'Field employees do not need an account here; they sign in on the Crewtraxa Employee app.' : 'Organization role required. Access is checked after authentication.'}
+              {isSignup ? 'Field employees use the Crewtraxa Employee app with their invited email address.' : 'Team access is checked after sign-in. New organization? We will guide you through setup.'}
             </div>
           </div>
 

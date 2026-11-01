@@ -5,11 +5,13 @@ import { useAuth } from './AuthProvider'
 import { setCurrentOrganizationId } from './organizationScope'
 import {
   consoleCapabilities,
+  consoleEntry,
   resolveActiveOrganization,
   type ConsoleAccess,
   type ConsoleInvitation,
   type ConsoleOrganization,
   type ConsoleRole,
+  type ConsoleEntry,
 } from '@/lib/consoleAccess'
 
 const ACTIVE_ORGANIZATION_KEY = 'crewtraxa-active-organization'
@@ -37,6 +39,8 @@ interface OrganizationContextValue {
   isOrgAdmin: boolean
   /** The account may create its own organization (self-service setup). */
   canCreateOrganization: boolean
+  entry: ConsoleEntry | null
+  refreshing: boolean
   switchOrganization: (id: string) => void
   /** Reloads Console access, e.g. after setup progress changes; resolves with the new access. */
   refreshAccess: () => Promise<ConsoleAccess | undefined>
@@ -102,6 +106,8 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         isPlatformAdmin,
         ...consoleCapabilities(role, isPlatformAdmin),
         canCreateOrganization: access?.can_create_organization ?? false,
+        entry: access ? consoleEntry(access) : null,
+        refreshing: accessQuery.isFetching,
         switchOrganization,
         refreshAccess,
         activateOrganization,
