@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowRight, Check, LogOut } from 'lucide-react'
 import { useAuth } from '@/api/AuthProvider'
@@ -82,7 +82,10 @@ function DoneStep({ onFinish, finishing, error }: { onFinish: () => void; finish
 
 export function SetupWizardPage() {
   const { session, signOut } = useAuth()
-  const { organization, refreshAccess } = useOrganization()
+  const { organization: activeOrganization, refreshAccess, canCreateOrganization } = useOrganization()
+  const location = useLocation()
+  const creatingOrganization = canCreateOrganization && new URLSearchParams(location.search).get('new') === '1'
+  const organization = creatingOrganization ? null : activeOrganization
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   // Saved progress: the furthest step reached, stored on the organization.
@@ -193,7 +196,7 @@ export function SetupWizardPage() {
           <div className="mx-auto w-full max-w-3xl">
             {progressError && <Alert variant="destructive" className="mb-5"><AlertDescription>{progressError}</AlertDescription></Alert>}
             <div key={step} className="animate-fade-in rounded-2xl border border-border/80 bg-card p-5 shadow-card sm:p-8">
-              {step === 'organization' && <OrganizationStep info={current} onCreated={() => setStep('company')} />}
+              {step === 'organization' && <OrganizationStep info={current} onCreated={() => { navigate('/setup', { replace: true }); setStep('company') }} />}
               {step === 'company' && <CompanyStep info={current} onDone={advance} />}
               {step === 'schedule' && <ScheduleStep info={current} onBack={back} onDone={advance} />}
               {step === 'rules' && <RulesStep info={current} onBack={back} onDone={advance} />}

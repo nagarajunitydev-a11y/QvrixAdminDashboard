@@ -36,8 +36,8 @@ const highlights = [
   },
   {
     icon: ShieldCheck,
-    title: 'Manager-only access',
-    description: 'Role-checked sign-in backed by Supabase Auth.',
+    title: 'One account for your team',
+    description: 'Join as a member or create your own organization.',
   },
 ]
 
@@ -103,7 +103,7 @@ export function LoginPage({ mode = 'login' }: { mode?: 'login' | 'forgot' | 'res
         }
         const created = await signUp(email, password)
         if (created) {
-          navigate('/setup', { replace: true })
+          navigate('/account', { replace: true })
           return
         }
         setSignupSent(true)
@@ -266,7 +266,7 @@ export function LoginPage({ mode = 'login' }: { mode?: 'login' | 'forgot' | 'res
                 {isForgot ? 'Forgot password?' : isReset ? 'Reset your password' : isSignup ? 'Create your account' : 'Welcome back'}
               </h2>
               <p className="mt-1 text-body-sm text-muted-foreground">
-                {isForgot ? 'Enter your email address to receive a password reset link.' : isReset ? 'Choose a new password for your account.' : isSignup ? 'Start a Crewtraxa workspace for your team. You will set up your organization next.' : 'Open your workspace, accept a team invitation, or set up your organization.'}
+                {isForgot ? 'Enter your email address to receive a password reset link.' : isReset ? 'Choose a new password for your account.' : isSignup ? 'Use one account to join your team or create an organization.' : 'Open your workspace, accept a team invitation, or set up your organization.'}
               </p>
             </div>
 
@@ -415,7 +415,7 @@ export function LoginPage({ mode = 'login' }: { mode?: 'login' | 'forgot' | 'res
 
             <div className="mt-5 flex items-center gap-2 border-t border-border/60 pt-4 text-[11px] text-muted-foreground">
               <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
-              {isSignup ? 'Field employees use the Crewtraxa Employee app with their invited email address.' : 'Team access is checked after sign-in. New organization? We will guide you through setup.'}
+              {isSignup ? 'One account for web and mobile. Join your team or create an organization after sign-in.' : 'Members open their personal workspace. Team managers open the Console.'}
             </div>
           </div>
 

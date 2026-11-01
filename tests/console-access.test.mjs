@@ -113,3 +113,10 @@ test('blocked accounts get the server-provided next step while invitations take 
   }
   assert.equal(consoleEntry({ ...empty, access_block_reason: 'employee', invitations: [{ id: 'i' }] }), 'invitations')
 })
+
+test('a member opens their personal workspace even when they can create an organization', () => {
+  const access = { is_platform_admin: false, organizations: [], member: { id: 'employee-1' }, can_create_organization: true }
+  assert.equal(consoleEntry(access), 'employee')
+  assert.deepEqual(consoleCapabilities(null, false), { canManage: false, isOrgAdmin: false })
+  assert.equal(consoleEntry({ ...access, organizations: [org('my-org', 'org_admin')] }), 'workspace')
+})

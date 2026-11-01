@@ -12,6 +12,8 @@ import {
   type ConsoleOrganization,
   type ConsoleRole,
   type ConsoleEntry,
+  type MemberProfile,
+  type EmployeeInvitation,
 } from '@/lib/consoleAccess'
 
 const ACTIVE_ORGANIZATION_KEY = 'crewtraxa-active-organization'
@@ -19,10 +21,21 @@ const ACTIVE_ORGANIZATION_KEY = 'crewtraxa-active-organization'
 export const consoleAccessKey = (userId: string | undefined) => ['console-access', userId ?? null] as const
 
 /** Console access comes from server-side organization membership, never editable user metadata. */
-export async function fetchConsoleAccess(): Promise<ConsoleAccess> {
-  const { data, error } = await supabase.rpc('my_console_access')
-  if (error) throw error
-  return data as ConsoleAccess
+export async function fetchConsoleAccess(userId: string): Promise<ConsoleAccess> {
+  // These existing RLS-protected reads work before the new web-clock migration is deployed.
+  const [consoleResult, memberResult, invitationResult] = await Promise.all([
+    supabase.rpc('my_console_access'),
+    supabase.from('employees')
+      .select('id, organization_id, first_name, last_name, organizations(id,name,timezone,is_active)')
+      .eq('user_id', userId).eq('is_active', true).maybeSingle(),
+    supabase.rpc('my_employee_invitations'),
+  ])
+  for (const result of [consoleResult, memberResult, invitationResult]) if (result.error) throw result.error
+  const member = memberResult.data as unknown as MemberProfile | null
+  return { ...consoleResult.data as ConsoleAccess,
+    member: member?.organizations?.is_active ? member : null,
+    employee_invitations: invitationResult.data as EmployeeInvitation[],
+  }
 }
 
 interface OrganizationContextValue {
@@ -41,6 +54,8 @@ interface OrganizationContextValue {
   canCreateOrganization: boolean
   entry: ConsoleEntry | null
   refreshing: boolean
+  member: MemberProfile | null
+  employeeInvitations: EmployeeInvitation[]
   switchOrganization: (id: string) => void
   /** Reloads Console access, e.g. after setup progress changes; resolves with the new access. */
   refreshAccess: () => Promise<ConsoleAccess | undefined>
@@ -62,7 +77,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
   const [storedId, setStoredId] = useState(() => localStorage.getItem(ACTIVE_ORGANIZATION_KEY))
   const accessQuery = useQuery({
     queryKey: consoleAccessKey(user?.id),
-    queryFn: fetchConsoleAccess,
+    queryFn: () => fetchConsoleAccess(user!.id),
     enabled: Boolean(user),
     staleTime: 60_000,
   })
@@ -84,11 +99,12 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
   const refreshAccess = useCallback(async () => (await accessQuery.refetch()).data, [accessQuery])
 
   const activateOrganization = useCallback(async (id: string) => {
+    queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== 'console-access' })
     localStorage.setItem(ACTIVE_ORGANIZATION_KEY, id)
     setStoredId(id)
     setCurrentOrganizationId(id)
     await accessQuery.refetch()
-  }, [accessQuery])
+  }, [accessQuery, queryClient])
 
   const isPlatformAdmin = access?.is_platform_admin ?? false
   const role = organization?.role ?? null
@@ -108,6 +124,8 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         canCreateOrganization: access?.can_create_organization ?? false,
         entry: access ? consoleEntry(access) : null,
         refreshing: accessQuery.isFetching,
+        member: access?.member ?? null,
+        employeeInvitations: access?.employee_invitations ?? [],
         switchOrganization,
         refreshAccess,
         activateOrganization,

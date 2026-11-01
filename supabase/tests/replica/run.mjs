@@ -610,10 +610,13 @@ await db.query(`insert into auth.users (id,email,raw_app_meta_data,email_confirm
 ok('unconfirmed accounts cannot create an organization', (await access(U(71))).can_create_organization === false
   && await err(() => createOrg(U(71), 'Pending Co')) === '42501')
 ok('a confirmed account without a role can', (await access(U(70))).can_create_organization === true)
-ok('members, employees and platform admins are not offered it', (await access(id.m1)).can_create_organization === false
-  && (await access(id.e1)).can_create_organization === false && (await access(U(60))).can_create_organization === false
-  && (await access(id.p1)).can_create_organization === false)
-ok('employees cannot create one', await err(() => createOrg(U(60), 'Side Business')) === '42501')
+ok('confirmed members and employees may create their own organization', (await access(id.m1)).can_create_organization === true
+  && (await access(id.e1)).can_create_organization === true && (await access(U(60))).can_create_organization === true)
+ok('platform admins use the platform organization tool', (await access(id.p1)).can_create_organization === false)
+const personalOrg = (await createOrg(U(60), 'Side Business'))[0].id
+ok('employee creation grants admin only in the new organization',
+  (await q(`select organization_id from organization_members where user_id=$1 and is_active`, [U(60)])).every(row => row.organization_id === personalOrg)
+  && (await q(`select organization_id from employees where user_id=$1`, [U(60)]))[0].organization_id === qvrix)
 ok('a former, archived employee can', (await access(id.e3)).can_create_organization === true)
 ok('a name is required', await err(() => createOrg(U(70), ' x ')) === '22023')
 ok('the time zone is checked', await err(() => createOrg(U(70), 'Acme Facilities', 'Mars/Base')) === '22023')
@@ -651,7 +654,7 @@ ok('anon cannot create organizations', await err(() => as(null, () => q(`select 
 ok('the eligibility check is not callable directly', await err(() => as(U(72), () => q(`select can_create_organization()`))) === '42501')
 
 // T15 access guidance: only the caller's server-verified status is exposed.
-ok('a linked employee is identified explicitly', (await access(id.e1)).access_block_reason === 'employee')
+ok('a linked employee may create an organization without a blocking error', (await access(id.e1)).access_block_reason === null)
 ok('an unconfirmed account gets email guidance', (await access(U(71))).access_block_reason === 'confirm_email')
 await db.query(`insert into auth.users (id,email,raw_app_meta_data,email_confirmed_at)
   values ($1,'brand-new@acme.test','{}',now())`, [U(74)])
@@ -664,6 +667,67 @@ ok('an owner whose membership was removed gets restoration guidance', (await acc
 await db.query(`update organization_members set is_active=true where organization_id=$1 and user_id=$2`, [acme, U(70)])
 ok('restoring membership restores the workspace', (await access(U(70))).organizations.some(o => o.id === acme))
 ok('anonymous callers cannot inspect account access', await err(() => as(null, () => q(`select my_console_access()`), 'anon')) === '42501')
+
+// T16 personal member access and web attendance. Synthetic accounts, never a live email override.
+await db.query(`insert into auth.users (id,email,raw_app_meta_data,email_confirmed_at) values
+  ($1,'web-member@acme.test','{}',now()),($2,'outsider@acme.test','{}',now())`, [U(80), U(81)])
+const memberEmployee = (await q(`insert into employees (organization_id,user_id,first_name,last_name,email)
+  values ($1,$2,'Web','Member','web-member@acme.test') returning id`, [acme, U(80)]))[0].id
+const acmeSiteId = (await q(`select id from sites where organization_id=$1 limit 1`, [acme]))[0].id
+await q(`insert into employee_sites (employee_id,site_id) values ($1,$2)`, [memberEmployee, acmeSiteId])
+const webClock = (uid, action, site = acmeSiteId, lat = 12.9, lng = 77.6, accuracy = 5) =>
+  as(uid, () => q(`select web_clock($1,$2,$3,$4,$5) id`, [action, site, lat, lng, accuracy]))
+const memberRows = await as(U(80), () => q(`select e.id,o.name from employees e join organizations o on o.id=e.organization_id where e.user_id=$1 and e.is_active`, [U(80)]))
+ok('a member reads their profile and organization without a console role', memberRows.length === 1 && memberRows[0].id === memberEmployee)
+ok('a member cannot read the team employee directory', await n(U(80), `select count(*)::int n from employees`) === 1)
+ok('an outsider cannot clock in', await err(() => webClock(U(81), 'in')) === '42501')
+ok('a member cannot clock into a foreign site', await err(() => webClock(U(80), 'in', U(201))) === '42501')
+ok('location is required', await err(() => webClock(U(80), 'in', acmeSiteId, null)) === '22023')
+ok('invalid GPS is rejected', await err(() => webClock(U(80), 'in', acmeSiteId, 100)) === '22023')
+ok('nonfinite GPS is rejected', await err(() => webClock(U(80), 'in', acmeSiteId, 'NaN')) === '22023')
+await q(`update time_tracking_policies set require_inside_site=true where organization_id=$1`, [acme])
+ok('outside a required fence is rejected', await err(() => webClock(U(80), 'in', acmeSiteId, 13.5)) === '42501')
+ok('uncertain accuracy extending beyond the fence is rejected', await err(() => webClock(U(80), 'in', acmeSiteId, 12.9, 77.6, 1000)) === '42501')
+await q(`update time_tracking_policies set lock_to_registered_device=true where organization_id=$1`, [acme])
+ok('registered-device policy requires the employee app', await err(() => webClock(U(80), 'in')) === '42501')
+await q(`update time_tracking_policies set lock_to_registered_device=false, block_outside_schedule=true where organization_id=$1`, [acme])
+await q(`update shifts set working_days=array[1]::smallint[] where organization_id=$1`, [acme])
+// A schedule starting next week cannot allow today's clock-in, including overnight/early windows.
+await q(`update shifts set working_days=array[((extract(isodow from now() at time zone 'Asia/Kolkata')::int + 2) % 7) + 1]::smallint[] where organization_id=$1`, [acme])
+ok('outside the work schedule is rejected', await err(() => webClock(U(80), 'in')) === '42501')
+await q(`update shifts set working_days=array[1,2,3,4,5,6,7]::smallint[], day_times='{}', day_split_time='00:00',
+  start_time=((now() at time zone 'Asia/Kolkata') - interval '1 hour')::time,
+  end_time=((now() at time zone 'Asia/Kolkata') + interval '1 hour')::time where organization_id=$1`, [acme])
+ok('the current fixed schedule window permits clock-in', await err(() => webClock(U(80), 'in')) === null)
+await webClock(U(80), 'out')
+await q(`update shifts set start_time=((now() at time zone 'Asia/Kolkata') + interval '2 hours')::time,
+  end_time=((now() at time zone 'Asia/Kolkata') + interval '3 hours')::time where organization_id=$1`, [acme])
+await q(`update time_tracking_policies set early_clock_in_minutes=10 where organization_id=$1`, [acme])
+ok('early clock-in before the configured window is rejected', await err(() => webClock(U(80), 'in')) === '42501')
+await q(`update time_tracking_policies set early_clock_in_minutes=180 where organization_id=$1`, [acme])
+ok('the configured early clock-in window permits attendance', await err(() => webClock(U(80), 'in')) === null)
+await webClock(U(80), 'out')
+await q(`update time_tracking_policies set early_clock_in_minutes=null where organization_id=$1`, [acme])
+await q(`update time_tracking_policies set block_outside_schedule=false where organization_id=$1`, [acme])
+const webId = (await webClock(U(80), 'in'))[0].id
+const webRow = (await q(`select * from presence_sessions where id=$1`, [webId]))[0]
+ok('web clock-in records the caller with server time', webRow.user_id === U(80) && webRow.organization_id === acme && webRow.site_id === acmeSiteId
+  && Math.abs(Number(webRow.entry_timestamp) - Date.now()) < 30000)
+ok('web clock-in records a GPS observation', (await q(`select count(*)::int n from location_logs where user_id=$1 and site_id=$2 and timestamp=$3`, [U(80), acmeSiteId, webRow.entry_timestamp]))[0].n >= 1)
+ok('duplicate clock-in is rejected', await err(() => webClock(U(80), 'in')) === '22023')
+await q(`update presence_sessions set last_heartbeat=0 where id=$1`, [webId])
+ok('web heartbeat keeps only the caller shift active', await err(() => webClock(U(80), 'heartbeat', null, null, null, null)) === null
+  && (await q(`select last_heartbeat from presence_sessions where id=$1`, [webId]))[0].last_heartbeat > 0)
+ok('an outsider cannot heartbeat another member shift', await err(() => webClock(U(81), 'heartbeat', null, null, null, null)) === '42501')
+await q(`delete from employee_sites where employee_id=$1`, [memberEmployee])
+await q(`update time_tracking_policies set lock_to_registered_device=true where organization_id=$1`, [acme])
+ok('clock-out works after site removal or a device policy change', await err(() => webClock(U(80), 'out', null, null, null, null)) === null)
+const closedWeb = (await q(`select exit_timestamp,closed_by,total_hours from presence_sessions where id=$1`, [webId]))[0]
+ok('web clock-out computes hours and attributes the caller', closedWeb.exit_timestamp !== null && closedWeb.closed_by === 'employee' && closedWeb.total_hours >= 0)
+ok('a member cannot read another member session', await n(U(81), `select count(*)::int n from presence_sessions where id=${webId}`) === 0)
+ok('web attendance denies anonymous calls', await err(() => as(null, () => q(`select web_clock('in')`), 'anon')) === '42501')
+await q(`update employees set is_active=false where id=$1`, [memberEmployee])
+ok('archived members cannot record web attendance', await err(() => webClock(U(80), 'in')) === '42501')
 
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

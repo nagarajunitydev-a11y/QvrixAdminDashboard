@@ -44,6 +44,7 @@ const navGroups = [
   {
     label: 'Workspace',
     items: [
+      { label: 'My account', to: '/account', icon: UsersRound },
       { label: 'Dashboard', to: '/', icon: LayoutDashboard },
       { label: 'Getting Started', to: '/getting-started', icon: Rocket },
       { label: 'Live Tracking', to: '/live-tracking', icon: Radar },

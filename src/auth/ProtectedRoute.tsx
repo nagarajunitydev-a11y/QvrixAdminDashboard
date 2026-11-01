@@ -3,7 +3,6 @@ import { useAuth } from '../api/AuthProvider'
 import { useOrganization } from '../api/OrganizationProvider'
 import { Button } from '@/components/ui/button'
 import { ConsoleInvitations } from '@/components/ConsoleInvitations'
-import { ConsoleAccessHelp } from '@/components/ConsoleAccessHelp'
 import { ErrorState } from '@/components/ui/states'
 import { consoleAccessErrorMessage, needsSetup } from '@/lib/consoleAccess'
 
@@ -15,7 +14,7 @@ function FullScreenSpinner() {
   )
 }
 
-export function ProtectedRoute() {
+export function ProtectedRoute({ accountPage = false }: { accountPage?: boolean }) {
   const { session, loading, isPasswordRecovery, signOut } = useAuth()
   const access = useOrganization()
   const location = useLocation()
@@ -47,6 +46,10 @@ export function ProtectedRoute() {
     )
   }
 
+  // Account and personal workspace routes require authentication, not a management role.
+  if (accountPage) return <Outlet />
+  if (onSetup && new URLSearchParams(location.search).get('new') === '1' && access.canCreateOrganization) return <Outlet />
+
   // Signed in with open invitations but no organization yet: accept or decline, or create one instead.
   if (!access.organization && access.invitations.length && !(onSetup && access.canCreateOrganization)) {
     return (
@@ -67,7 +70,7 @@ export function ProtectedRoute() {
 
   // No organization yet, but allowed to create one: the setup wizard starts there.
   if (!access.organization && access.canCreateOrganization) {
-    return onSetup ? <Outlet /> : <Navigate to="/setup" replace />
+    return onSetup ? <Outlet /> : <Navigate to={access.member ? '/me' : '/account'} replace />
   }
 
   // A platform admin can create the first organization even when none exist yet.
@@ -76,7 +79,7 @@ export function ProtectedRoute() {
   }
 
   // Authentication succeeded. Keep the session so invitations or restored roles can be rechecked.
-  if (!access.organization) return <ConsoleAccessHelp />
+  if (!access.organization) return <Navigate to={access.member ? '/me' : '/account'} replace />
 
   // Organization admins finish or skip setup before the workspace opens; setup resumes where it was left.
   if (needsSetup(access.organization)) {

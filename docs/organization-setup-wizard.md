@@ -1,5 +1,11 @@
 # Self-service sign-up and organization setup wizard
 
+Update 2026-11-01: sign-in now opens an account chooser for new accounts and a personal workspace
+for linked members. Employees and Console members may create one separate self-service organization
+after `20261101000001_member_web_workflow.sql`; joining an employer no longer requires a Console role.
+See `sign-in-access-workflow.md` for the current flow. The original implementation notes below
+describe the initial eligibility restrictions and tests before that update.
+
 Prepared 2026-10-31. Request: a Jibble-style organization setup after sign-in. Jibble's own setup page
 (`web.jibble.io/getting-started`) needs a Jibble account, so it was not opened. The flow follows the step order
 in Jibble's public help article on onboarding (work schedule, clock-in rules, automatic clock-out, locations,

@@ -33,6 +33,24 @@ export interface ConsoleAccess {
   can_create_organization?: boolean
   /** Server diagnosis for accounts without a Console membership (migration 20261101000000). */
   access_block_reason?: 'employee' | 'confirm_email' | 'organization_unavailable' | 'role_required' | null
+  member?: MemberProfile | null
+  employee_invitations?: EmployeeInvitation[]
+}
+
+export interface MemberProfile {
+  id: string
+  organization_id: string
+  first_name: string
+  last_name: string
+  organizations: { id: string; name: string; timezone: string; is_active: boolean }
+}
+
+export interface EmployeeInvitation {
+  employee_id: string
+  organization_id: string
+  organization_name: string
+  first_name: string
+  last_name: string
 }
 
 export type ConsoleEntry = 'workspace' | 'invitations' | 'setup' | 'upgrade' | 'employee'
@@ -43,6 +61,7 @@ export function consoleEntry(access: ConsoleAccess): ConsoleEntry {
   if (access.organizations.length) return 'workspace'
   if (access.invitations?.length) return 'invitations'
   if (access.is_platform_admin) return 'platform'
+  if (access.member) return 'employee'
   if (access.can_create_organization === true) return 'setup'
   // Older RPCs omit this flag. Never confuse a missing database feature with an employee account.
   if (access.can_create_organization === undefined) return 'upgrade'

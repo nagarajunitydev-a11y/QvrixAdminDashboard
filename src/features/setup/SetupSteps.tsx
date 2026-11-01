@@ -165,8 +165,8 @@ export function OrganizationStep({ info, onCreated }: { info: SetupStepInfo; onC
       {invitations.data && invitations.data.length > 0 && (
         <Alert>
           <AlertDescription>
-            {invitations.data.map((i) => i.organization_name).join(', ')} added you as an employee. Employees check in with the
-            Crewtraxa app and do not need an organization here. Continue only if you are setting up a new organization.
+            {invitations.data.map((i) => i.organization_name).join(', ')} invited you as a member. You can accept from My account
+            and open your personal workspace. Continue here only to create a separate organization of your own.
           </AlertDescription>
         </Alert>
       )}

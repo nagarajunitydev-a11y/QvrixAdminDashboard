@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Check, MailPlus, X } from 'lucide-react'
 import { useOrganization } from '@/api/OrganizationProvider'
 import { respondToConsoleInvitation } from '@/api/organizations'
@@ -13,7 +14,9 @@ import { cn } from '@/lib/utils'
  * account holder accepts here; an organization cannot add someone on its own.
  */
 export function ConsoleInvitations({ className }: { className?: string }) {
-  const { invitations } = useOrganization()
+  const { invitations, activateOrganization } = useOrganization()
+  const navigate = useNavigate()
+  const location = useLocation()
   const queryClient = useQueryClient()
   const { toast } = useToast()
 
@@ -22,6 +25,10 @@ export function ConsoleInvitations({ className }: { className?: string }) {
       respondToConsoleInvitation(input.invitation.id, input.accept),
     onSuccess: async (_, { invitation, accept }) => {
       await queryClient.invalidateQueries({ queryKey: ['console-access'] })
+      if (accept && location.pathname === '/account') {
+        await activateOrganization(invitation.organization_id)
+        navigate('/', { replace: true })
+      }
       toast(accept
         ? { title: `Joined ${invitation.organization_name}`, description: `Your role is ${roleLabels[invitation.role].toLowerCase()}. Switch organizations from the sidebar.` }
         : { title: 'Invitation declined', description: invitation.organization_name })

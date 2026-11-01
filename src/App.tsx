@@ -8,6 +8,8 @@ import { ThemeProvider } from './components/ThemeProvider'
 import { ToastProvider } from './components/ui/toast'
 import { ManagerLayout } from './components/ManagerLayout'
 import { LoginPage } from './components/LoginPage'
+import { ConsoleAccessHelp } from './components/ConsoleAccessHelp'
+import { MemberWorkspacePage } from './features/member/MemberWorkspacePage'
 
 // Lazy-loaded feature pages
 import { DashboardPage } from './features/dashboard/DashboardPage'
@@ -47,6 +49,10 @@ function App() {
                   <Route path="/signup" element={<LoginPage key="signup" mode="signup" />} />
                   <Route path="/forgot-password" element={<LoginPage key="forgot" mode="forgot" />} />
                   <Route path="/reset-password" element={<LoginPage key="reset" mode="reset" />} />
+                  <Route element={<ProtectedRoute accountPage />}>
+                    <Route path="/account" element={<ConsoleAccessHelp />} />
+                    <Route path="/me" element={<MemberWorkspacePage />} />
+                  </Route>
                   <Route element={<ProtectedRoute />}>
                     <Route path="/setup" element={<SetupWizardPage />} />
                     <Route element={<ManagerLayout />}>
